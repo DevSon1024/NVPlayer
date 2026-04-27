@@ -18,13 +18,13 @@ val splitApks = !project.hasProperty("noSplits") && !gradle.startParameter.taskN
 }
 
 android {
-    namespace = "com.devson.picone"
+    namespace = "com.devson.default"
     compileSdk {
         version = release(36)
     }
 
     defaultConfig {
-        applicationId = "com.devson.picone"
+        applicationId = "com.devson.default"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -58,7 +58,7 @@ android {
             isDebuggable = true
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            resValue("string", "app_name", "PicOne Beta")
+            resValue("string", "app_name", "default Beta")
         }
 
         release {
@@ -68,7 +68,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            resValue("string", "app_name", "PicOne")
+            resValue("string", "app_name", "default")
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }

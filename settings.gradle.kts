@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "picone"
+rootProject.name = "default"
 include(":app")

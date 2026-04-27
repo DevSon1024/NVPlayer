@@ -1,4 +1,4 @@
-package com.devson.picone.ui.theme
+package com.devson.default.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

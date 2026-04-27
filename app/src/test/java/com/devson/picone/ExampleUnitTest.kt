@@ -1,4 +1,4 @@
-package com.devson.picone
+package com.devson.default
 
 import org.junit.Test
 
