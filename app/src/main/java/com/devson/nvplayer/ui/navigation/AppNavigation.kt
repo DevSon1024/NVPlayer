@@ -28,6 +28,13 @@ fun AppNavigation(
 ) {
     val navController = rememberNavController()
 
+    // 1. Create a safe back navigation helper to prevent popping the start destination
+    val safePopBackStack: () -> Unit = {
+        if (navController.previousBackStackEntry != null) {
+            navController.popBackStack()
+        }
+    }
+
     NavHost(navController = navController, startDestination = "home") {
         composable("home") {
             HomeScreen(
@@ -43,7 +50,7 @@ fun AppNavigation(
 
         composable("settings") {
             SettingsScreen(
-                onBack = { navController.popBackStack() },
+                onBack = safePopBackStack, // 2. Use the safe helper
                 onNavigateToAbout = {},
                 onNavigateToLogs = {},
                 onNavigateToPrivacyPolicy = {},
@@ -54,7 +61,7 @@ fun AppNavigation(
 
         composable("appearance") {
             AppearanceSettingsScreen(
-                onNavigateBack = { navController.popBackStack() },
+                onNavigateBack = safePopBackStack, // 2. Use the safe helper
                 settingsViewModel = settingsViewModel
             )
         }
@@ -67,7 +74,7 @@ fun AppNavigation(
             FolderScreen(
                 folderName = folderName,
                 viewModel = folderViewModel,
-                onBackClick = { navController.popBackStack() },
+                onBackClick = safePopBackStack, // 2. Use the safe helper
                 onVideoClick = { uri ->
                     playerViewModel.loadVideo(uri)
                     navController.navigate("player")
@@ -93,9 +100,7 @@ fun AppNavigation(
                 onSetPlaybackSpeed = { playerViewModel.setPlaybackSpeed(it) },
                 onCycleSubtitle = { playerViewModel.cycleSubtitle() },
                 onCycleAudio = { playerViewModel.cycleAudio() },
-                onBackClick = {
-                    navController.popBackStack()
-                }
+                onBackClick = safePopBackStack // 2. Use the safe helper
             )
         }
     }
