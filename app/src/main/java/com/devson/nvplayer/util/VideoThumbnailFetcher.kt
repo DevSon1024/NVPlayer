@@ -1,5 +1,6 @@
 package com.devson.nvplayer.util
 
+import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
 import android.graphics.Bitmap
@@ -12,26 +13,18 @@ import coil.decode.DataSource
 import coil.fetch.DrawableResult
 import coil.fetch.FetchResult
 import coil.fetch.Fetcher
-import coil.key.Keyer
 import coil.request.Options
 import coil.size.Dimension
-
-data class VideoThumbnailModel(val uriString: String)
-
-class VideoThumbnailKeyer : Keyer<VideoThumbnailModel> {
-    override fun key(data: VideoThumbnailModel, options: Options): String? {
-        return data.uriString
-    }
-}
+import java.io.File
 
 class VideoThumbnailFetcher(
-    private val data: VideoThumbnailModel,
+    private val data: Uri,
     private val options: Options
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult? {
         val context = options.context
-        val uri = Uri.parse(data.uriString)
+        val uri = data
         
         val bitmap: Bitmap? = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -113,9 +106,38 @@ class VideoThumbnailFetcher(
         }
     }
 
-    class Factory : Fetcher.Factory<VideoThumbnailModel> {
-        override fun create(data: VideoThumbnailModel, options: Options, imageLoader: coil.ImageLoader): Fetcher {
-            return VideoThumbnailFetcher(data, options)
+    class Factory(private val context: Context) : Fetcher.Factory<Uri> {
+        override fun create(data: Uri, options: Options, imageLoader: coil.ImageLoader): Fetcher? {
+            // If the request specifies a video frame time/micros, don't intercept it (let VideoFrameDecoder handle it)
+            val hasFrameSpec = options.parameters.any { it.first.contains("video_frame", ignoreCase = true) }
+            if (hasFrameSpec) {
+                return null
+            }
+
+            // Check if this is a video URI
+            val scheme = data.scheme
+            val isVideo = if (scheme == ContentResolver.SCHEME_CONTENT) {
+                val type = context.contentResolver.getType(data)
+                type?.startsWith("video/") == true || data.pathSegments.contains("video")
+            } else if (scheme == ContentResolver.SCHEME_FILE) {
+                val path = data.path
+                path != null && (
+                    path.endsWith(".mp4", ignoreCase = true) ||
+                    path.endsWith(".mkv", ignoreCase = true) ||
+                    path.endsWith(".webm", ignoreCase = true) ||
+                    path.endsWith(".avi", ignoreCase = true) ||
+                    path.endsWith(".3gp", ignoreCase = true) ||
+                    path.endsWith(".flv", ignoreCase = true)
+                )
+            } else {
+                false
+            }
+
+            return if (isVideo) {
+                VideoThumbnailFetcher(data, options)
+            } else {
+                null
+            }
         }
     }
 }

@@ -31,6 +31,7 @@ import com.devson.nvplayer.viewmodel.FileOperationsViewModel
 import coil.ImageLoader
 import coil.Coil
 import coil.decode.VideoFrameDecoder
+import com.devson.nvplayer.util.VideoThumbnailFetcher
 
 class MainActivity : ComponentActivity() {
 
@@ -60,6 +61,7 @@ class MainActivity : ComponentActivity() {
 
         val imageLoader = ImageLoader.Builder(this)
             .components {
+                add(VideoThumbnailFetcher.Factory(applicationContext))
                 add(VideoFrameDecoder.Factory())
             }
             .build()
