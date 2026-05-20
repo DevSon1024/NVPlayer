@@ -21,6 +21,9 @@ class VideoListViewModel(private val repository: VideoRepository) : ViewModel() 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    private val _loadingProgress = MutableStateFlow(0f)
+    val loadingProgress: StateFlow<Float> = _loadingProgress.asStateFlow()
+
     private val _selectedFolder = MutableStateFlow<VideoFolder?>(null)
     val selectedFolder: StateFlow<VideoFolder?> = _selectedFolder.asStateFlow()
 
@@ -42,45 +45,51 @@ class VideoListViewModel(private val repository: VideoRepository) : ViewModel() 
     fun loadVideos(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             if (forceRefresh) _isRefreshing.value = true else _isLoading.value = true
+            _loadingProgress.value = 0f
             try {
                 val folderItems = repository.getFolders()
                 val mappedVideos = mutableMapOf<VideoFolder, List<Video>>()
                 val allVideos = mutableListOf<Video>()
+                val totalFolders = folderItems.size
 
-                folderItems.forEach { folderItem ->
-                    val videoItems = repository.getVideosByFolder(folderItem.name)
-                    val videos = videoItems.map { item ->
-                        val dateVal = try {
-                            File(item.path).lastModified() / 1000L
-                        } catch (e: Exception) {
-                            0L
+                if (totalFolders > 0) {
+                    folderItems.forEachIndexed { index, folderItem ->
+                        _loadingProgress.value = index.toFloat() / totalFolders.toFloat()
+                        val videoItems = repository.getVideosByFolder(folderItem.name)
+                        val videos = videoItems.map { item ->
+                            val dateVal = try {
+                                File(item.path).lastModified() / 1000L
+                            } catch (e: Exception) {
+                                0L
+                            }
+                            Video(
+                                uri = item.uri.toString(),
+                                title = item.title,
+                                duration = item.duration,
+                                folderName = item.folderName,
+                                path = item.path,
+                                size = item.size,
+                                width = item.width,
+                                height = item.height,
+                                dateAdded = dateVal,
+                                playedTime = null,
+                                lastPlayedAt = null,
+                                resolution = "${item.width}x${item.height}",
+                                frameRate = 30.0f
+                            )
                         }
-                        Video(
-                            uri = item.uri.toString(),
-                            title = item.title,
-                            duration = item.duration,
-                            folderName = item.folderName,
-                            path = item.path,
-                            size = item.size,
-                            width = item.width,
-                            height = item.height,
-                            dateAdded = dateVal,
-                            playedTime = null,
-                            lastPlayedAt = null,
-                            resolution = "${item.width}x${item.height}",
-                            frameRate = 30.0f
-                        )
-                    }
-                    if (videos.isNotEmpty()) {
-                        val videoFolder = VideoFolder(
-                            id = File(videos.first().path).parentFile?.absolutePath ?: folderItem.name,
-                            name = folderItem.name
-                        )
-                        mappedVideos[videoFolder] = videos
-                        allVideos.addAll(videos)
+                        if (videos.isNotEmpty()) {
+                            val videoFolder = VideoFolder(
+                                id = File(videos.first().path).parentFile?.absolutePath ?: folderItem.name,
+                                name = folderItem.name
+                            )
+                            mappedVideos[videoFolder] = videos
+                            allVideos.addAll(videos)
+                        }
                     }
                 }
 
+                _loadingProgress.value = 1f
                 allVideosList = allVideos
                 _videosByFolder.value = mappedVideos
                 updateExplorerNodes()

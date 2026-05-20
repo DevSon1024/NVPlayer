@@ -86,7 +86,7 @@ android {
         variant.outputs.all {
             val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
             val abiName = outputImpl.filters.find { it.filterType == "ABI" }?.identifier ?: "universal"
-            outputFileName = "PixChive-v${variant.versionName}-${abiName}.apk"
+            outputFileName = "NVPlayer-v${variant.versionName}-${abiName}.apk"
         }
     }
     compileOptions {
@@ -118,8 +118,9 @@ android {
 }
 
 dependencies {
-    implementation(group = "", name = "mpv-android-lib-v0.0.1", ext = "aar")
+    implementation(files("libs/mpv-android-lib-v0.0.1.aar"))
     implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.graphics.shapes)
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.documentfile:documentfile:1.0.1")
 

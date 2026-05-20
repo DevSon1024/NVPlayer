@@ -15,8 +15,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
+import androidx.graphics.shapes.RoundedPolygon
+import androidx.graphics.shapes.circle
+import androidx.graphics.shapes.star
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -40,7 +46,7 @@ import com.devson.nvplayer.ui.screens.videolist.components.list.VideoListContent
 import com.devson.nvplayer.ui.screens.videolist.components.explorer.ExplorerListContent
 import com.devson.nvplayer.ui.screens.videolist.components.selection.VideoSelectionBottomBar
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HomeScreen(
     viewModel: VideoListViewModel,
@@ -413,7 +419,32 @@ fun HomeScreen(
             }
 
             if (isLoading && videosByFolder.isEmpty()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                val progress by viewModel.loadingProgress.collectAsState()
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    val polygons = remember {
+                        listOf(
+                            RoundedPolygon.circle(numVertices = 8),
+                            RoundedPolygon.star(numVerticesPerRadius = 5, innerRadius = 0.5f),
+                            RoundedPolygon.star(numVerticesPerRadius = 8, innerRadius = 0.6f)
+                        )
+                    }
+                    LoadingIndicator(
+                        progress = { progress },
+                        modifier = Modifier.size(72.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        polygons = polygons
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    // Text(
+                    //     text = "Loading Folders... ${(progress * 100).toInt()}%",
+                    //     style = MaterialTheme.typography.bodyMedium,
+                    //     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                    // )
+                }
             } else {
                 PullToRefreshBox(
                     isRefreshing = isRefreshing,

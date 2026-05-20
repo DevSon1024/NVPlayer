@@ -19,3 +19,13 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Protect mpv-android library JNI bindings
+-keep class is.xyz.mpv.** { *; }
+
+# Protect your own player package just in case it relies on JNI reflection
+-keep class com.devson.nvplayer.player.** { *; }
+
+# Keep Coil (your image loader) running smoothly in release
+-keep class coil.** { *; }
+-keep interface coil.** { *; }
