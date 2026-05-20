@@ -4,20 +4,34 @@ import android.app.Activity
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.net.Uri
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.rounded.VolumeMute
+import androidx.compose.material.icons.automirrored.rounded.VolumeDown
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -27,7 +41,13 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.devson.nvplayer.player.MPVSurfaceView
 import com.devson.nvplayer.player.PlayerState
 import com.devson.nvplayer.ui.component.PlayerControls
+import com.devson.nvplayer.ui.component.GestureOverlay
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
+import android.media.AudioManager
+import android.content.Context
 
 @Composable
 fun PlayerScreen(
@@ -39,6 +59,9 @@ fun PlayerScreen(
     videoWidth: Long,
     videoHeight: Long,
     videoRotation: Long,
+    playbackSpeed: Float,
+    savedBrightness: Float,
+    savedVolume: Int,
     onPlayPauseToggle: () -> Unit,
     onSeek: (Long) -> Unit,
     onSetPlaybackSpeed: (Float) -> Unit,
@@ -46,6 +69,8 @@ fun PlayerScreen(
     onCycleAudio: () -> Unit,
     onBackClick: () -> Unit,
     onSurfaceReady: () -> Unit,
+    onSaveBrightness: (Float) -> Unit,
+    onSaveVolume: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val deepCharcoal = Color(0xFF0F0F11)
@@ -55,6 +80,22 @@ fun PlayerScreen(
     var controlsVisible by remember { mutableStateOf(true) }
     var isDragging by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    val activity = remember(context) { context.findActivity() }
+    val audioManager = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+
+    // Restore saved brightness and volume on startup
+    LaunchedEffect(Unit) {
+        activity?.let { act ->
+            val lp = act.window.attributes
+            lp.screenBrightness = savedBrightness
+            act.window.attributes = lp
+        }
+        if (savedVolume >= 0) {
+            val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, savedVolume.coerceIn(0, maxVol), 0)
+        }
+    }
 
     // Dynamically adjust screen orientation to fit the natural display orientation of the loaded video
     LaunchedEffect(videoWidth, videoHeight, videoRotation) {
@@ -83,13 +124,17 @@ fun PlayerScreen(
     val currentOnPlayPauseToggle by rememberUpdatedState(onPlayPauseToggle)
     val currentIsPlaying by rememberUpdatedState(isPlaying)
 
-    // FIX: Enforce standard vertical layout when leaving PlayerScreen to return to lists and pause audio
+    // FIX: Enforce standard vertical layout when leaving PlayerScreen to return to lists and pause audio,
+    // and restore default screen brightness
     DisposableEffect(Unit) {
         onDispose {
             var currentContext = context
             while (currentContext is ContextWrapper) {
                 if (currentContext is Activity) {
                     currentContext.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                    val lp = currentContext.window.attributes
+                    lp.screenBrightness = -1.0f // Restore default screen brightness
+                    currentContext.window.attributes = lp
                     break
                 }
                 currentContext = currentContext.baseContext
@@ -109,14 +154,7 @@ fun PlayerScreen(
     }
 
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                controlsVisible = !controlsVisible
-            }
+        modifier = modifier.fillMaxSize()
     ) {
         val currentOnSurfaceReady by rememberUpdatedState(onSurfaceReady)
 
@@ -197,6 +235,22 @@ fun PlayerScreen(
             }
 
             else -> {
+                GestureOverlay(
+                    isPlaying = isPlaying,
+                    currentPosition = currentPosition,
+                    duration = duration,
+                    playbackSpeed = playbackSpeed,
+                    savedBrightness = savedBrightness,
+                    savedVolume = savedVolume,
+                    onPlayPauseToggle = onPlayPauseToggle,
+                    onSeek = onSeek,
+                    onSetPlaybackSpeed = onSetPlaybackSpeed,
+                    onSaveBrightness = onSaveBrightness,
+                    onSaveVolume = onSaveVolume,
+                    controlsVisible = controlsVisible,
+                    onControlsVisibleChanged = { controlsVisible = it }
+                )
+
                 // Unified Premium Controls Layer
                 AnimatedVisibility(
                     visible = controlsVisible,
@@ -216,10 +270,8 @@ fun PlayerScreen(
                         onCycleSubtitle = onCycleSubtitle,
                         onCycleAudio = onCycleAudio,
                         onBackClick = onBackClick,
-                        modifier = Modifier.clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) { /* Stops outer click propagation */ }
+                        playbackSpeed = playbackSpeed,
+                        modifier = Modifier
                     )
                 }
 
@@ -236,4 +288,13 @@ fun PlayerScreen(
             }
         }
     }
+}
+
+private fun Context.findActivity(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    return null
 }

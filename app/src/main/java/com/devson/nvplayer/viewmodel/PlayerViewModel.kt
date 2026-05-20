@@ -34,6 +34,34 @@ class PlayerViewModel(
     private val _currentUri = MutableStateFlow<Uri?>(null)
     val currentUri: StateFlow<Uri?> = _currentUri.asStateFlow()
 
+    private val _playbackSpeed = MutableStateFlow(1.0f)
+    val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
+
+    private val playerPrefs by lazy {
+        getApplication<Application>().getSharedPreferences("player_settings_prefs", Context.MODE_PRIVATE)
+    }
+
+    private val _savedBrightness = MutableStateFlow(0.5f)
+    val savedBrightness: StateFlow<Float> = _savedBrightness.asStateFlow()
+
+    private val _savedVolume = MutableStateFlow(-1)
+    val savedVolume: StateFlow<Int> = _savedVolume.asStateFlow()
+
+    init {
+        _savedBrightness.value = playerPrefs.getFloat("brightness", 0.5f)
+        _savedVolume.value = playerPrefs.getInt("volume", -1)
+    }
+
+    fun saveBrightness(brightness: Float) {
+        playerPrefs.edit().putFloat("brightness", brightness).apply()
+        _savedBrightness.value = brightness
+    }
+
+    fun saveVolume(volume: Int) {
+        playerPrefs.edit().putInt("volume", volume).apply()
+        _savedVolume.value = volume
+    }
+
     private var isVideoLoaded = false
 
     /**
@@ -101,6 +129,7 @@ class PlayerViewModel(
     }
 
     fun setPlaybackSpeed(speed: Float) {
+        _playbackSpeed.value = speed
         playerEngine.setPlaybackSpeed(speed)
     }
 

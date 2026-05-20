@@ -114,6 +114,9 @@ fun AppNavigation(
             val videoWidth by playerViewModel.videoWidth.collectAsState()
             val videoHeight by playerViewModel.videoHeight.collectAsState()
             val videoRotation by playerViewModel.videoRotation.collectAsState()
+            val playbackSpeed by playerViewModel.playbackSpeed.collectAsState()
+            val savedBrightness by playerViewModel.savedBrightness.collectAsState()
+            val savedVolume by playerViewModel.savedVolume.collectAsState()
 
             PlayerScreen(
                 playbackState = playbackState,
@@ -124,13 +127,18 @@ fun AppNavigation(
                 videoWidth = videoWidth,
                 videoHeight = videoHeight,
                 videoRotation = videoRotation,
+                playbackSpeed = playbackSpeed,
+                savedBrightness = savedBrightness,
+                savedVolume = savedVolume,
                 onPlayPauseToggle = { playerViewModel.togglePlayback() },
                 onSeek = { playerViewModel.seekTo(it) },
                 onSetPlaybackSpeed = { playerViewModel.setPlaybackSpeed(it) },
                 onCycleSubtitle = { playerViewModel.cycleSubtitle() },
                 onCycleAudio = { playerViewModel.cycleAudio() },
                 onBackClick = safePopBackStack, // 2. Use the safe helper
-                onSurfaceReady = { playerViewModel.loadVideoIfNeeded() }
+                onSurfaceReady = { playerViewModel.loadVideoIfNeeded() },
+                onSaveBrightness = { playerViewModel.saveBrightness(it) },
+                onSaveVolume = { playerViewModel.saveVolume(it) }
             )
         }
     }

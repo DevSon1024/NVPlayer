@@ -43,10 +43,11 @@ fun PlayerControls(
     onCycleSubtitle: () -> Unit,
     onCycleAudio: () -> Unit,
     onBackClick: () -> Unit,
+    playbackSpeed: Float,
     modifier: Modifier = Modifier
 ) {
     val speeds = listOf(0.5f, 1.0f, 1.25f, 1.5f, 2.0f)
-    var currentSpeedIndex by remember { mutableIntStateOf(1) }
+    val currentSpeedIndex = remember(playbackSpeed) { speeds.indexOf(playbackSpeed).coerceAtLeast(0) }
 
     // Decouple local slider state to stop the visual slider jumping backwards while dragging
     val safeDuration = duration.coerceAtLeast(1L).toFloat()
@@ -160,8 +161,8 @@ fun PlayerControls(
                     .background(Color.White.copy(alpha = 0.08f))
                     .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                     .clickable {
-                        currentSpeedIndex = (currentSpeedIndex + 1) % speeds.size
-                        onSetPlaybackSpeed(speeds[currentSpeedIndex])
+                        val nextIndex = (currentSpeedIndex + 1) % speeds.size
+                        onSetPlaybackSpeed(speeds[nextIndex])
                     }
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center
@@ -282,6 +283,7 @@ fun PlayerControls(
                     draggingJob?.cancel()
                     onDraggingChanged(true)
                     sliderPosition = newVal
+                    onSeek(newVal.toLong())
                 },
                 onValueChangeFinished = {
                     onSeek(sliderPosition.toLong())
