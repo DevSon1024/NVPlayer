@@ -48,7 +48,8 @@ class PlaybackSettingsRepository(context: Context) {
             "is_subtitle_bold", "force_ass_subtitle_override", "seek_gesture_enabled", "seek_sensitivity",
             "brightness_gesture_enabled", "brightness_sensitivity", "volume_gesture_enabled", "volume_sensitivity",
             "two_finger_action", "three_finger_action", "long_press_enabled", "long_press_speed", "double_tap_action",
-            "subtitle_text_size_scale", "subtitle_bg_style", "subtitle_delay_ms", "subtitle_vertical_offset", "subtitle_gestures_enabled" -> {
+            "subtitle_text_size_scale", "subtitle_bg_style", "subtitle_delay_ms", "subtitle_vertical_offset", "subtitle_gestures_enabled",
+            "custom_playback_speed", "tap_and_hold_speed", "double_tap_seek_duration" -> {
                 _playbackSettingsFlow.value = loadPlaybackSettings()
             }
         }
@@ -160,7 +161,10 @@ class PlaybackSettingsRepository(context: Context) {
             subtitleBgStyle = prefs.getInt("subtitle_bg_style", 1),
             subtitleDelayMs = prefs.getLong("subtitle_delay_ms", 0L),
             subtitleVerticalOffset = prefs.getFloat("subtitle_vertical_offset", 0f),
-            subtitleGesturesEnabled = prefs.getBoolean("subtitle_gestures_enabled", true)
+            subtitleGesturesEnabled = prefs.getBoolean("subtitle_gestures_enabled", true),
+            customPlaybackSpeed = prefs.getFloat("custom_playback_speed", 1.0f),
+            tapAndHoldSpeed = prefs.getFloat("tap_and_hold_speed", 2.0f),
+            doubleTapSeekDuration = prefs.getLong("double_tap_seek_duration", 10000L)
         )
     }
 
@@ -204,6 +208,9 @@ class PlaybackSettingsRepository(context: Context) {
             putLong("subtitle_delay_ms", updated.subtitleDelayMs)
             putFloat("subtitle_vertical_offset", updated.subtitleVerticalOffset)
             putBoolean("subtitle_gestures_enabled", updated.subtitleGesturesEnabled)
+            putFloat("custom_playback_speed", updated.customPlaybackSpeed)
+            putFloat("tap_and_hold_speed", updated.tapAndHoldSpeed)
+            putLong("double_tap_seek_duration", updated.doubleTapSeekDuration)
             apply()
         }
     }
@@ -379,5 +386,37 @@ class PlaybackSettingsRepository(context: Context) {
 
     suspend fun updateSubtitleGesturesEnabled(enabled: Boolean) {
         updatePlaybackSettings { it.copy(subtitleGesturesEnabled = enabled) }
+    }
+
+    suspend fun updateCustomPlaybackSpeed(speed: Float) {
+        updatePlaybackSettings { it.copy(customPlaybackSpeed = speed) }
+    }
+
+    suspend fun updateTapAndHoldSpeed(speed: Float) {
+        updatePlaybackSettings { it.copy(tapAndHoldSpeed = speed) }
+    }
+
+    suspend fun updateDoubleTapSeekDuration(durationMs: Long) {
+        updatePlaybackSettings { it.copy(doubleTapSeekDuration = durationMs) }
+    }
+
+    suspend fun updateShowSeekButtons(show: Boolean) {
+        updatePlaybackSettings { it.copy(showSeekButtons = show) }
+    }
+
+    suspend fun updateControlIconSize(size: String) {
+        updatePlaybackSettings { it.copy(controlIconSize = size) }
+    }
+
+    suspend fun updateAutoPlayEnabled(enabled: Boolean) {
+        updatePlaybackSettings { it.copy(autoPlayEnabled = enabled) }
+    }
+
+    suspend fun updateFastplaySpeed(speed: Float) {
+        updatePlaybackSettings { it.copy(fastplaySpeed = speed) }
+    }
+
+    suspend fun updateSeekDurationSeconds(seconds: Int) {
+        updatePlaybackSettings { it.copy(seekDurationSeconds = seconds) }
     }
 }

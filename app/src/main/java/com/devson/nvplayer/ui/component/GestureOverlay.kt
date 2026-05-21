@@ -55,6 +55,9 @@ fun GestureOverlay(
     onSaveVolume: (Int) -> Unit,
     controlsVisible: Boolean,
     onControlsVisibleChanged: (Boolean) -> Unit,
+    customPlaybackSpeed: Float,
+    tapAndHoldSpeed: Float,
+    doubleTapSeekDurationMs: Long,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -135,13 +138,12 @@ fun GestureOverlay(
                         dragStarted = false
                         isLeftHalfDrag = startPosition.x < size.width / 2f
 
-                        val speedBeforeOverride = playbackSpeedState.value
-
+                        val isEdge = startPosition.x < size.width * 0.15f || startPosition.x > size.width * 0.85f
                         longPressJob = launch {
                             delay(500L)
-                            if (!dragStarted) {
+                            if (!dragStarted && isEdge) {
                                 isLongPressSpeedActive = true
-                                onSetPlaybackSpeedState.value(2.0f)
+                                onSetPlaybackSpeedState.value(tapAndHoldSpeed)
                             }
                         }
 
@@ -200,7 +202,7 @@ fun GestureOverlay(
 
                                 if (isLongPressSpeedActive) {
                                     isLongPressSpeedActive = false
-                                    onSetPlaybackSpeedState.value(speedBeforeOverride)
+                                    onSetPlaybackSpeedState.value(customPlaybackSpeed)
                                 } else if (dragStarted) {
                                     if (isLeftHalfDrag) {
                                         onSaveBrightnessState.value(currentBrightnessFloat)
@@ -228,10 +230,10 @@ fun GestureOverlay(
                                         val width = size.width
                                         val x = tapOffset.x
                                         if (x < width * 0.4f) {
-                                            val newPos = (currentPositionState.value - 10000L).coerceAtLeast(0L)
+                                            val newPos = (currentPositionState.value - doubleTapSeekDurationMs).coerceAtLeast(0L)
                                             onSeekState.value(newPos)
                                             leftClearJob?.cancel()
-                                            leftAccumulatedMs += 10000L
+                                            leftAccumulatedMs += doubleTapSeekDurationMs
                                             leftRippleTick++
                                             leftRippleActive = true
                                             leftClearJob = launch {
@@ -240,10 +242,10 @@ fun GestureOverlay(
                                                 leftRippleActive = false
                                             }
                                         } else if (x > width * 0.6f) {
-                                            val newPos = (currentPositionState.value + 10000L).coerceAtMost(durationState.value)
+                                            val newPos = (currentPositionState.value + doubleTapSeekDurationMs).coerceAtMost(durationState.value)
                                             onSeekState.value(newPos)
                                             rightClearJob?.cancel()
-                                            rightAccumulatedMs += 10000L
+                                            rightAccumulatedMs += doubleTapSeekDurationMs
                                             rightRippleTick++
                                             rightRippleActive = true
                                             rightClearJob = launch {
@@ -412,7 +414,7 @@ fun GestureOverlay(
                 .align(Alignment.TopCenter)
                 .padding(top = 80.dp)
         ) {
-            FastForwardBadge(speed = 2.0f)
+            FastForwardBadge(speed = tapAndHoldSpeed)
         }
     }
 }

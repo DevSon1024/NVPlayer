@@ -181,7 +181,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 threeFingerAction = com.devson.nvplayer.repository.MultiFingerAction.FAST_PLAY,
                 longPressEnabled = true,
                 longPressSpeed = 2.0f,
-                doubleTapAction = com.devson.nvplayer.repository.DoubleTapAction.BOTH
+                doubleTapAction = com.devson.nvplayer.repository.DoubleTapAction.BOTH,
+                customPlaybackSpeed = 1.0f,
+                tapAndHoldSpeed = 2.0f,
+                doubleTapSeekDuration = 10000L
             )
         )
 
@@ -308,5 +311,37 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun updateSubtitleGesturesEnabled(enabled: Boolean) {
         viewModelScope.launch { settingsRepo.updateSubtitleGesturesEnabled(enabled) }
+    }
+
+    fun updateCustomPlaybackSpeed(speed: Float) {
+        viewModelScope.launch { settingsRepo.updateCustomPlaybackSpeed(speed) }
+    }
+
+    fun updateTapAndHoldSpeed(speed: Float) {
+        viewModelScope.launch { settingsRepo.updateTapAndHoldSpeed(speed) }
+    }
+
+    fun updateDoubleTapSeekDuration(durationMs: Long) {
+        viewModelScope.launch { settingsRepo.updateDoubleTapSeekDuration(durationMs) }
+    }
+
+    fun updateShowSeekButtons(show: Boolean) {
+        viewModelScope.launch { settingsRepo.updateShowSeekButtons(show) }
+    }
+
+    fun updateControlIconSize(size: String) {
+        viewModelScope.launch { settingsRepo.updateControlIconSize(size) }
+    }
+
+    fun updateAutoPlayEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.updateAutoPlayEnabled(enabled) }
+    }
+
+    fun updateFastplaySpeed(speed: Float) {
+        viewModelScope.launch { settingsRepo.updateFastplaySpeed(speed) }
+    }
+
+    fun updateSeekDurationSeconds(seconds: Int) {
+        viewModelScope.launch { settingsRepo.updateSeekDurationSeconds(seconds) }
     }
 }

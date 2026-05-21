@@ -49,7 +49,7 @@ fun PlayerControls(
     onDraggingChanged: (Boolean) -> Unit,
     onPlayPauseToggle: () -> Unit,
     onSeek: (Long) -> Unit,
-    onSetPlaybackSpeed: (Float) -> Unit,
+    onSpeedClick: () -> Unit,
     onCycleSubtitle: () -> Unit,
     onCycleAudio: () -> Unit,
     onBackClick: () -> Unit,
@@ -61,8 +61,6 @@ fun PlayerControls(
     onPrevClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val speeds = listOf(0.5f, 1.0f, 1.25f, 1.5f, 2.0f)
-    val currentSpeedIndex = remember(playbackSpeed) { speeds.indexOf(playbackSpeed).coerceAtLeast(0) }
 
     // Decouple local slider state to stop the visual slider jumping backwards while dragging
     val safeDuration = duration.coerceAtLeast(1L).toFloat()
@@ -175,10 +173,7 @@ fun PlayerControls(
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color.White.copy(alpha = 0.08f))
                     .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                    .clickable {
-                        val nextIndex = (currentSpeedIndex + 1) % speeds.size
-                        onSetPlaybackSpeed(speeds[nextIndex])
-                    }
+                    .clickable { onSpeedClick() }
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -192,8 +187,13 @@ fun PlayerControls(
                         tint = Color.White,
                         modifier = Modifier.size(16.dp)
                     )
+                    val speedText = if (playbackSpeed % 1.0f == 0.0f) {
+                        "${playbackSpeed.toInt()}x"
+                    } else {
+                        String.format(java.util.Locale.US, "%.2fx", playbackSpeed).trimEnd('0').trimEnd('.') + "x"
+                    }
                     Text(
-                        text = "${speeds[currentSpeedIndex]}x",
+                        text = speedText,
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 13.sp

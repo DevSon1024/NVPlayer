@@ -38,9 +38,7 @@ import kotlin.math.abs
 fun AudioSettingsSideSheet(
     visible: Boolean,
     audioTracks: List<TrackInfo>,
-    playbackSpeed: Float,
     onSelectAudioTrack: (Int) -> Unit,
-    onSetPlaybackSpeed: (Float) -> Unit,
     onDismiss: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
@@ -118,7 +116,7 @@ fun AudioSettingsSideSheet(
                                 modifier = Modifier.size(24.dp)
                             )
                             Text(
-                                text = "Audio & Speed",
+                                text = "Audio Settings",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -159,122 +157,6 @@ fun AudioSettingsSideSheet(
                                         isSelected = track.selected,
                                         onClick = { onSelectAudioTrack(track.id) }
                                     )
-                                }
-                            }
-                        }
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-
-                        // Section 2: Playback Speed
-                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            SectionHeader(title = "Playback Rate")
-
-                            // Fine-grained Speed Slider
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Custom Speed",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = "%.2fx".format(playbackSpeed),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 4.dp)
-                                ) {
-                                    IconButton(
-                                        onClick = {
-                                            val newSpeed = (playbackSpeed - 0.05f).coerceAtLeast(0.25f)
-                                            onSetPlaybackSpeed(newSpeed)
-                                        },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(Icons.Rounded.Remove, contentDescription = "Decrease speed")
-                                    }
-                                    Slider(
-                                        value = playbackSpeed,
-                                        onValueChange = { onSetPlaybackSpeed(it) },
-                                        valueRange = 0.25f..4.0f,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    IconButton(
-                                        onClick = {
-                                            val newSpeed = (playbackSpeed + 0.05f).coerceAtMost(4.0f)
-                                            onSetPlaybackSpeed(newSpeed)
-                                        },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(Icons.Rounded.Add, contentDescription = "Increase speed")
-                                    }
-                                }
-                            }
-
-                            // Speed Presets
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = "Presets",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-
-                                val presetSpeeds = listOf(
-                                    listOf(0.5f, 0.75f, 1.0f),
-                                    listOf(1.25f, 1.5f, 1.75f),
-                                    listOf(2.0f, 2.5f, 3.0f)
-                                )
-
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    presetSpeeds.forEach { rowSpeeds ->
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            rowSpeeds.forEach { speed ->
-                                                val isSelected = abs(playbackSpeed - speed) < 0.01f
-                                                val containerColor = if (isSelected) {
-                                                    MaterialTheme.colorScheme.primary
-                                                } else {
-                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-                                                }
-                                                val contentColor = if (isSelected) {
-                                                    MaterialTheme.colorScheme.onPrimary
-                                                } else {
-                                                    MaterialTheme.colorScheme.onSurface
-                                                }
-
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .clip(RoundedCornerShape(8.dp))
-                                                        .background(containerColor)
-                                                        .clickable { onSetPlaybackSpeed(speed) }
-                                                        .padding(vertical = 10.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = "${speed}x",
-                                                        fontSize = 13.sp,
-                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                        color = contentColor
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
                                 }
                             }
                         }

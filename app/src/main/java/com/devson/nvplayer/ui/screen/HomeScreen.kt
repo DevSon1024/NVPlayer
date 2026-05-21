@@ -1,6 +1,8 @@
 package com.devson.nvplayer.ui.screen
 
 import android.net.Uri
+import android.os.Environment
+import android.os.StatFs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -88,6 +90,29 @@ fun HomeScreen(
     }
 
     var searchQuery by remember { mutableStateOf("") }
+
+    val storageInfo = remember {
+        try {
+            val path = Environment.getExternalStorageDirectory().absolutePath
+            val stat = StatFs(path)
+            val blockSize = stat.blockSizeLong
+            val totalBlocks = stat.blockCountLong
+            val availableBlocks = stat.availableBlocksLong
+            
+            val totalBytes = totalBlocks * blockSize
+            val availableBytes = availableBlocks * blockSize
+            val usedBytes = totalBytes - availableBytes
+            
+            val totalGB = totalBytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
+            val usedGB = usedBytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
+            val progress = if (totalBytes > 0) usedBytes.toFloat() / totalBytes else 0f
+            val percentage = (progress * 100).toInt()
+            
+            Triple(totalGB, usedGB, percentage)
+        } catch (e: Exception) {
+            Triple(0.0, 0.0, 0)
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -209,8 +234,81 @@ fun HomeScreen(
                 )
             }
 
+            // Storage Analytics Card (Premium Design)
+            if (viewSettings.showStorageTracker) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Storage,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Storage Analyzer",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Text(
+                                text = "${storageInfo.third}%",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        
+                        LinearProgressIndicator(
+                            progress = { (storageInfo.third.toFloat() / 100f).coerceIn(0f, 1f) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        )
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "${String.format("%.1f", storageInfo.second)} GB Used",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                            Text(
+                                text = "${String.format("%.1f", storageInfo.first)} GB Total",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+            }
+
             // 4. Continue Watching
-            if (continueWatchingVideos.isNotEmpty()) {
+            if (viewSettings.showHistoryCard && continueWatchingVideos.isNotEmpty()) {
                 Column {
                     Text(
                         text = "Continue Watching",
@@ -267,7 +365,7 @@ fun HomeScreen(
             }
 
             // 6. Recent Folders
-            if (folders.isNotEmpty()) {
+            if (viewSettings.showVideoCard && folders.isNotEmpty()) {
                 Column(
                     modifier = Modifier.padding(horizontal = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)

@@ -54,6 +54,7 @@ import com.devson.nvplayer.repository.PlaybackSettings
 import com.devson.nvplayer.ui.component.SubtitleSettingsSideSheet
 import com.devson.nvplayer.ui.component.AudioSettingsSideSheet
 import com.devson.nvplayer.ui.component.ComposeSubtitleOverlay
+import com.devson.nvplayer.ui.component.PlaybackSpeedSideSheet
 import androidx.activity.compose.BackHandler
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -104,12 +105,19 @@ fun PlayerScreen(
     onUpdateSubtitleBgStyle: (Int) -> Unit = {},
     onUpdateSubtitleDelay: (Long) -> Unit = {},
     onUpdateSubtitleVerticalOffset: (Float) -> Unit = {},
-    onUpdateSubtitleGesturesEnabled: (Boolean) -> Unit = {}
+    onUpdateSubtitleGesturesEnabled: (Boolean) -> Unit = {},
+    onUpdateCustomPlaybackSpeed: (Float) -> Unit = {},
+    onUpdateTapAndHoldSpeed: (Float) -> Unit = {},
+    onUpdateDoubleTapSeekDuration: (Long) -> Unit = {},
+    onUpdateLongPressEnabled: (Boolean) -> Unit = {},
+    onUpdateLongPressSpeed: (Float) -> Unit = {},
+    onUpdateDoubleTapAction: (com.devson.nvplayer.repository.DoubleTapAction) -> Unit = {}
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
     var isDragging by remember { mutableStateOf(false) }
     var showSubtitleSettingsSideSheet by remember { mutableStateOf(false) }
     var showAudioSettingsSideSheet by remember { mutableStateOf(false) }
+    var showPlaybackSpeedSideSheet by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     val activity = remember(context) { context.findActivity() }
@@ -310,7 +318,10 @@ fun PlayerScreen(
                     onSaveBrightness = onSaveBrightness,
                     onSaveVolume = onSaveVolume,
                     controlsVisible = controlsVisible,
-                    onControlsVisibleChanged = { controlsVisible = it }
+                    onControlsVisibleChanged = { controlsVisible = it },
+                    customPlaybackSpeed = playbackSettings.customPlaybackSpeed,
+                    tapAndHoldSpeed = playbackSettings.tapAndHoldSpeed,
+                    doubleTapSeekDurationMs = playbackSettings.doubleTapSeekDuration
                 )
 
                 ComposeSubtitleOverlay(
@@ -343,7 +354,9 @@ fun PlayerScreen(
                         onDraggingChanged = { isDragging = it },
                         onPlayPauseToggle = onPlayPauseToggle,
                         onSeek = onSeek,
-                        onSetPlaybackSpeed = onSetPlaybackSpeed,
+                        onSpeedClick = {
+                            showPlaybackSpeedSideSheet = true
+                        },
                         onCycleSubtitle = {
                             showSubtitleSettingsSideSheet = true
                         },
@@ -394,10 +407,23 @@ fun PlayerScreen(
         AudioSettingsSideSheet(
             visible = showAudioSettingsSideSheet,
             audioTracks = audioTracks,
-            playbackSpeed = playbackSpeed,
             onSelectAudioTrack = onSelectAudioTrack,
-            onSetPlaybackSpeed = onSetPlaybackSpeed,
             onDismiss = { showAudioSettingsSideSheet = false }
+        )
+
+        PlaybackSpeedSideSheet(
+            visible = showPlaybackSpeedSideSheet,
+            currentSpeed = playbackSpeed,
+            playbackSettings = playbackSettings,
+            onSpeedSelected = { speed ->
+                onUpdateCustomPlaybackSpeed(speed)
+            },
+            onUpdateDoubleTapAction = onUpdateDoubleTapAction,
+            onUpdateDoubleTapSeekDuration = onUpdateDoubleTapSeekDuration,
+            onUpdateLongPressEnabled = onUpdateLongPressEnabled,
+            onUpdateTapAndHoldSpeed = onUpdateTapAndHoldSpeed,
+            onUpdateLongPressSpeed = onUpdateLongPressSpeed,
+            onDismiss = { showPlaybackSpeedSideSheet = false }
         )
     }
 }

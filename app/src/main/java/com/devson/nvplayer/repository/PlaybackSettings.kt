@@ -58,5 +58,8 @@ data class PlaybackSettings(
     val subtitleBgStyle: Int = 1,
     val subtitleDelayMs: Long = 0L,
     val subtitleVerticalOffset: Float = 0f,
-    val subtitleGesturesEnabled: Boolean = true
+    val subtitleGesturesEnabled: Boolean = true,
+    val customPlaybackSpeed: Float = 1.0f,
+    val tapAndHoldSpeed: Float = 2.0f,
+    val doubleTapSeekDuration: Long = 10000L
 )

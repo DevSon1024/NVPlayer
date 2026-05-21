@@ -15,6 +15,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -61,6 +62,14 @@ class PlayerViewModel(
 
     private val _savedVolume = MutableStateFlow(-1)
     val savedVolume: StateFlow<Int> = _savedVolume.asStateFlow()
+
+    private val settingsRepo = com.devson.nvplayer.repository.PlaybackSettingsRepository(application.applicationContext)
+    val playbackSettings = settingsRepo.playbackSettingsFlow
+        .stateIn(
+            viewModelScope,
+            kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000),
+            com.devson.nvplayer.repository.PlaybackSettings()
+        )
 
     init {
         _savedBrightness.value = playerPrefs.getFloat("brightness", 0.5f)
@@ -154,6 +163,10 @@ class PlayerViewModel(
             Log.d("PlayerViewModel", "Loading prepared video into engine: $uri")
             playerEngine.loadVideo(uri)
             isVideoLoaded = true
+            
+            // Set playback speed to customPlaybackSpeed preference value
+            val customSpeed = settingsRepo.playbackSettingsFlow.value.customPlaybackSpeed
+            setPlaybackSpeed(customSpeed)
         }
     }
 
@@ -277,6 +290,25 @@ class PlayerViewModel(
 
     fun seekPrevSubtitle() {
         playerEngine.seekPrevSubtitle()
+    }
+
+    fun updateCustomPlaybackSpeed(speed: Float) {
+        viewModelScope.launch {
+            settingsRepo.updateCustomPlaybackSpeed(speed)
+            setPlaybackSpeed(speed)
+        }
+    }
+
+    fun updateTapAndHoldSpeed(speed: Float) {
+        viewModelScope.launch {
+            settingsRepo.updateTapAndHoldSpeed(speed)
+        }
+    }
+
+    fun updateDoubleTapSeekDuration(durationMs: Long) {
+        viewModelScope.launch {
+            settingsRepo.updateDoubleTapSeekDuration(durationMs)
+        }
     }
 
     override fun onCleared() {

@@ -16,6 +16,9 @@ import com.devson.nvplayer.ui.screen.SearchResultsScreen
 import com.devson.nvplayer.ui.screen.SettingsScreen
 import com.devson.nvplayer.ui.screen.AppearanceSettingsScreen
 import com.devson.nvplayer.ui.screen.RecycleBinScreen
+import com.devson.nvplayer.ui.screen.GestureSettingsScreen
+import com.devson.nvplayer.ui.screen.CustomHomeSettingsScreen
+import com.devson.nvplayer.ui.screen.PlayerInterfaceSettingsScreen
 import com.devson.nvplayer.ui.screens.videolist.VideoListScreen
 import com.devson.nvplayer.viewmodel.HomeViewModel
 import com.devson.nvplayer.viewmodel.FolderViewModel
@@ -104,6 +107,9 @@ fun AppNavigation(
                 onNavigateToLogs = {},
                 onNavigateToPrivacyPolicy = {},
                 onNavigateToAppearance = { navController.navigate("appearance") },
+                onNavigateToGestures = { navController.navigate("gestures") },
+                onNavigateToCustomHome = { navController.navigate("custom_home") },
+                onNavigateToPlayerInterface = { navController.navigate("player_interface") },
                 settingsViewModel = settingsViewModel
             )
         }
@@ -111,6 +117,27 @@ fun AppNavigation(
         composable("appearance") {
             AppearanceSettingsScreen(
                 onNavigateBack = safePopBackStack, // 2. Use the safe helper
+                settingsViewModel = settingsViewModel
+            )
+        }
+
+        composable("gestures") {
+            GestureSettingsScreen(
+                onNavigateBack = safePopBackStack,
+                settingsViewModel = settingsViewModel
+            )
+        }
+
+        composable("custom_home") {
+            CustomHomeSettingsScreen(
+                onNavigateBack = safePopBackStack,
+                settingsViewModel = settingsViewModel
+            )
+        }
+
+        composable("player_interface") {
+            PlayerInterfaceSettingsScreen(
+                onNavigateBack = safePopBackStack,
                 settingsViewModel = settingsViewModel
             )
         }
@@ -220,7 +247,13 @@ fun AppNavigation(
                 onUpdateSubtitleBgStyle = { settingsViewModel.updateSubtitleBgStyle(it) },
                 onUpdateSubtitleDelay = { settingsViewModel.updateSubtitleDelay(it) },
                 onUpdateSubtitleVerticalOffset = { settingsViewModel.updateSubtitleVerticalOffset(it) },
-                onUpdateSubtitleGesturesEnabled = { settingsViewModel.updateSubtitleGesturesEnabled(it) }
+                onUpdateSubtitleGesturesEnabled = { settingsViewModel.updateSubtitleGesturesEnabled(it) },
+                onUpdateCustomPlaybackSpeed = { playerViewModel.updateCustomPlaybackSpeed(it) },
+                onUpdateTapAndHoldSpeed = { playerViewModel.updateTapAndHoldSpeed(it) },
+                onUpdateDoubleTapSeekDuration = { playerViewModel.updateDoubleTapSeekDuration(it) },
+                onUpdateLongPressEnabled = { settingsViewModel.updateLongPressEnabled(it) },
+                onUpdateLongPressSpeed = { settingsViewModel.updateLongPressSpeed(it) },
+                onUpdateDoubleTapAction = { settingsViewModel.updateDoubleTapAction(it) }
             )
         }
     }
