@@ -119,7 +119,8 @@ fun PlayerScreen(
     onUpdateDoubleTapSeekDuration: (Long) -> Unit = {},
     onUpdateLongPressEnabled: (Boolean) -> Unit = {},
     onUpdateLongPressSpeed: (Float) -> Unit = {},
-    onUpdateDoubleTapAction: (com.devson.nvplayer.repository.DoubleTapAction) -> Unit = {}
+    onUpdateDoubleTapAction: (com.devson.nvplayer.repository.DoubleTapAction) -> Unit = {},
+    onTakeVideoScreenshot: () -> Unit = {}
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
     var isDragging by remember { mutableStateOf(false) }
@@ -434,6 +435,8 @@ fun PlayerScreen(
                     tapAndHoldSpeed = playbackSettings.tapAndHoldSpeed,
                     doubleTapSeekDurationMs = playbackSettings.doubleTapSeekDuration,
                     playbackSettings = playbackSettings,
+                    onShowMuteIcon = {},
+                    onTakeVideoScreenshot = onTakeVideoScreenshot,
                     onZoomChange = onZoomChange
                 )
 

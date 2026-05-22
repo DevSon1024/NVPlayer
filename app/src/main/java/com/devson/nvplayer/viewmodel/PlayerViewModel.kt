@@ -5,6 +5,12 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
+import android.widget.Toast
+import android.provider.DocumentsContract
+import android.os.Environment
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -189,6 +195,7 @@ class PlayerViewModel(
         if (index != -1 && index < list.size - 1) {
             val nextUri = list[index + 1]
             changeVideo(nextUri)
+            play()
         }
     }
 
@@ -200,6 +207,7 @@ class PlayerViewModel(
         if (index > 0) {
             val prevUri = list[index - 1]
             changeVideo(prevUri)
+            play()
         }
     }
 
@@ -312,6 +320,82 @@ class PlayerViewModel(
         viewModelScope.launch {
             settingsRepo.updateDoubleTapSeekDuration(durationMs)
         }
+    }
+
+    fun takeVideoScreenshot() {
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            val location = playbackSettings.value.screenshotLocation
+            val resolvedPath = getPhysicalPathFromTreeUri(context, location)
+            
+            try {
+                withContext(Dispatchers.IO) {
+                    `is`.xyz.mpv.MPVLib.setOptionString("screenshot-directory", resolvedPath)
+                    `is`.xyz.mpv.MPVLib.command("screenshot", "video")
+                }
+                Toast.makeText(context, "Screenshot saved to: $resolvedPath", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Log.e("PlayerViewModel", "Failed to take video screenshot", e)
+                Toast.makeText(context, "Screenshot failed: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun getPhysicalPathFromTreeUri(context: Context, uriString: String): String {
+        if (!uriString.startsWith("content://")) {
+            val extDir = Environment.getExternalStorageDirectory()
+            val file = File(extDir, uriString)
+            if (!file.exists()) {
+                file.mkdirs()
+            }
+            return file.absolutePath
+        }
+
+        try {
+            val uri = Uri.parse(uriString)
+            if (uri.authority == "com.android.externalstorage.documents") {
+                val docId = DocumentsContract.getTreeDocumentId(uri)
+                val split = docId.split(":")
+                if (split.size >= 2) {
+                    val type = split[0]
+                    val relativePath = split[1]
+                    if ("primary".equals(type, ignoreCase = true)) {
+                        val file = File(Environment.getExternalStorageDirectory(), relativePath)
+                        if (!file.exists()) {
+                            file.mkdirs()
+                        }
+                        return file.absolutePath
+                    } else {
+                        val extDirs = context.getExternalFilesDirs(null)
+                        for (extDir in extDirs) {
+                            if (extDir != null) {
+                                val path = extDir.absolutePath
+                                val index = path.indexOf("/Android/data")
+                                if (index != -1) {
+                                    val root = path.substring(0, index)
+                                    val file = File(root, relativePath)
+                                    if (!file.exists()) {
+                                        file.mkdirs()
+                                    }
+                                    return file.absolutePath
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PlayerViewModel", "Error resolving SAF URI: $uriString", e)
+        }
+
+        val defaultDir = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+            "NVPlayer/Screenshot"
+        )
+        if (!defaultDir.exists()) {
+            defaultDir.mkdirs()
+        }
+        return defaultDir.absolutePath
     }
 
     override fun onCleared() {

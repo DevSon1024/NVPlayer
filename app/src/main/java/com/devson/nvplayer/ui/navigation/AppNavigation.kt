@@ -282,7 +282,8 @@ fun AppNavigation(
                 onUpdateDoubleTapSeekDuration = { playerViewModel.updateDoubleTapSeekDuration(it) },
                 onUpdateLongPressEnabled = { settingsViewModel.updateLongPressEnabled(it) },
                 onUpdateLongPressSpeed = { settingsViewModel.updateLongPressSpeed(it) },
-                onUpdateDoubleTapAction = { settingsViewModel.updateDoubleTapAction(it) }
+                onUpdateDoubleTapAction = { settingsViewModel.updateDoubleTapAction(it) },
+                onTakeVideoScreenshot = { playerViewModel.takeVideoScreenshot() }
             )
         }
     }

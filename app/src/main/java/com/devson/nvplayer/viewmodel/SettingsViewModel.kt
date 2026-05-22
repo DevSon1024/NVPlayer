@@ -193,7 +193,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 doubleTapAction = com.devson.nvplayer.repository.DoubleTapAction.BOTH,
                 customPlaybackSpeed = 1.0f,
                 tapAndHoldSpeed = 2.0f,
-                doubleTapSeekDuration = 10000L
+                doubleTapSeekDuration = 10000L,
+                screenshotLocation = "Pictures/NVPlayer/Screenshot"
             )
         )
 
@@ -356,5 +357,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun updateSeekDurationSeconds(seconds: Int) {
         viewModelScope.launch { settingsRepo.updateSeekDurationSeconds(seconds) }
+    }
+
+    fun updateScreenshotLocation(location: String) {
+        viewModelScope.launch { settingsRepo.updateScreenshotLocation(location) }
     }
 }

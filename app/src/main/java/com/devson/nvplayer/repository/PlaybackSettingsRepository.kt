@@ -49,7 +49,7 @@ class PlaybackSettingsRepository(context: Context) {
             "brightness_gesture_enabled", "brightness_sensitivity", "volume_gesture_enabled", "volume_sensitivity",
             "two_finger_action", "three_finger_action", "long_press_enabled", "long_press_speed", "double_tap_action",
             "subtitle_text_size_scale", "subtitle_bg_style", "subtitle_delay_ms", "subtitle_vertical_offset", "subtitle_gestures_enabled",
-            "custom_playback_speed", "tap_and_hold_speed", "double_tap_seek_duration" -> {
+            "custom_playback_speed", "tap_and_hold_speed", "double_tap_seek_duration", "screenshot_location" -> {
                 _playbackSettingsFlow.value = loadPlaybackSettings()
             }
         }
@@ -165,7 +165,8 @@ class PlaybackSettingsRepository(context: Context) {
             subtitleGesturesEnabled = prefs.getBoolean("subtitle_gestures_enabled", true),
             customPlaybackSpeed = prefs.getFloat("custom_playback_speed", 1.0f),
             tapAndHoldSpeed = prefs.getFloat("tap_and_hold_speed", 2.0f),
-            doubleTapSeekDuration = prefs.getLong("double_tap_seek_duration", 10000L)
+            doubleTapSeekDuration = prefs.getLong("double_tap_seek_duration", 10000L),
+            screenshotLocation = prefs.getString("screenshot_location", "Pictures/NVPlayer/Screenshot") ?: "Pictures/NVPlayer/Screenshot"
         )
     }
 
@@ -213,6 +214,7 @@ class PlaybackSettingsRepository(context: Context) {
             putFloat("custom_playback_speed", updated.customPlaybackSpeed)
             putFloat("tap_and_hold_speed", updated.tapAndHoldSpeed)
             putLong("double_tap_seek_duration", updated.doubleTapSeekDuration)
+            putString("screenshot_location", updated.screenshotLocation)
             apply()
         }
     }
@@ -424,5 +426,9 @@ class PlaybackSettingsRepository(context: Context) {
 
     suspend fun updateSeekDurationSeconds(seconds: Int) {
         updatePlaybackSettings { it.copy(seekDurationSeconds = seconds) }
+    }
+
+    suspend fun updateScreenshotLocation(location: String) {
+        updatePlaybackSettings { it.copy(screenshotLocation = location) }
     }
 }

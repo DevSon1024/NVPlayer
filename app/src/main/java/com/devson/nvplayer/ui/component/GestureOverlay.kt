@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.VolumeDown
 import androidx.compose.material.icons.automirrored.rounded.VolumeMute
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -71,6 +72,8 @@ fun GestureOverlay(
     tapAndHoldSpeed: Float,
     doubleTapSeekDurationMs: Long,
     playbackSettings: PlaybackSettings = PlaybackSettings(),
+    onShowMuteIcon: (Boolean) -> Unit = {},
+    onTakeVideoScreenshot: () -> Unit = {},
     // Callback fired during pinch-to-zoom (only when twoFingerAction == PINCH_ZOOM)
     onZoomChange: ((scaleMultiplier: Float, pan: Offset) -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -80,6 +83,19 @@ fun GestureOverlay(
     val activity = remember(context) { context.findActivity() }
     val audioManager = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     val maxVolume = remember(audioManager) { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) }
+
+    var lastUnmutedVolume by remember { mutableIntStateOf(maxVolume / 2) }
+    var muteOverlayVisible by remember { mutableStateOf(false) }
+    var muteOverlayIsMuted by remember { mutableStateOf(false) }
+    var muteOverlayTick by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(muteOverlayTick) {
+        if (muteOverlayTick > 0) {
+            muteOverlayVisible = true
+            delay(1000L)
+            muteOverlayVisible = false
+        }
+    }
 
     var isLongPressSpeedActive by remember { mutableStateOf(false) }
     var speedBeforeLongPress by remember { mutableStateOf(1.0f) }
@@ -154,7 +170,12 @@ fun GestureOverlay(
         onFastPlayChanged: (Boolean) -> Unit,
         isFastPlay: Boolean,
         view: android.view.View,
-        activity: Activity?
+        activity: Activity?,
+        lastUnmutedVolume: Int,
+        onLastUnmutedVolumeChanged: (Int) -> Unit,
+        onShowMuteIcon: (Boolean) -> Unit,
+        onTakeVideoScreenshot: () -> Unit,
+        onTriggerMuteOverlay: (Boolean) -> Unit
     ) {
         when (action) {
             MultiFingerAction.PLAY_PAUSE -> {
@@ -174,34 +195,18 @@ fun GestureOverlay(
             MultiFingerAction.MUTE -> {
                 val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
                 if (currentVol > 0) {
+                    onLastUnmutedVolumeChanged(currentVol)
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0)
-                    onShowToast("Muted")
+                    onShowMuteIcon(true)
+                    onTriggerMuteOverlay(true)
                 } else {
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume / 2, 0)
-                    onShowToast("Unmuted")
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, lastUnmutedVolume, 0)
+                    onShowMuteIcon(false)
+                    onTriggerMuteOverlay(false)
                 }
             }
             MultiFingerAction.SCREENSHOT -> {
-                try {
-                    val bitmap = android.graphics.Bitmap.createBitmap(
-                        view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888
-                    )
-                    val canvas = android.graphics.Canvas(bitmap)
-                    view.draw(canvas)
-                    val dir = File(
-                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-                        "NVPlayer"
-                    )
-                    dir.mkdirs()
-                    val fileName = "screenshot_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.png"
-                    val file = File(dir, fileName)
-                    FileOutputStream(file).use { out ->
-                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                    }
-                    onShowToast("Screenshot saved")
-                } catch (e: Exception) {
-                    onShowToast("Screenshot failed")
-                }
+                onTakeVideoScreenshot()
             }
             MultiFingerAction.PINCH_ZOOM -> { /* handled by detectTransformGestures, not a tap action */ }
             MultiFingerAction.NONE -> { /* no-op */ }
@@ -346,7 +351,15 @@ fun GestureOverlay(
                                         onFastPlayChanged = { isFastPlayActive = it },
                                         isFastPlay = currentFastPlay,
                                         view = view,
-                                        activity = activity
+                                        activity = activity,
+                                        lastUnmutedVolume = lastUnmutedVolume,
+                                        onLastUnmutedVolumeChanged = { lastUnmutedVolume = it },
+                                        onShowMuteIcon = onShowMuteIcon,
+                                        onTakeVideoScreenshot = onTakeVideoScreenshot,
+                                        onTriggerMuteOverlay = { isMuted ->
+                                            muteOverlayIsMuted = isMuted
+                                            muteOverlayTick++
+                                        }
                                     )
                                 } else if (dragStarted) {
                                     if (isLeftHalfDrag) {
@@ -621,6 +634,29 @@ fun GestureOverlay(
                 .padding(top = 50.dp)
         ) {
             FastForwardBadge(speed = tapAndHoldSpeed)
+        }
+
+        AnimatedVisibility(
+            visible = muteOverlayVisible,
+            enter = fadeIn(animationSpec = tween(150)) + scaleIn(initialScale = 0.8f, animationSpec = tween(150)),
+            exit = fadeOut(animationSpec = tween(150)) + scaleOut(targetScale = 0.8f, animationSpec = tween(150)),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(88.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color.Black.copy(alpha = 0.65f))
+                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
+            ) {
+                Icon(
+                    imageVector = if (muteOverlayIsMuted) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp,
+                    contentDescription = "Mute Toggle",
+                    tint = Color.White,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
         }
     }
 }

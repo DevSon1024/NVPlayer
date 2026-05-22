@@ -62,5 +62,7 @@ data class PlaybackSettings(
     val subtitleGesturesEnabled: Boolean = true,
     val customPlaybackSpeed: Float = 1.0f,
     val tapAndHoldSpeed: Float = 2.0f,
-    val doubleTapSeekDuration: Long = 10000L
+    val doubleTapSeekDuration: Long = 10000L,
+    val screenshotLocation: String = "Pictures/NVPlayer/Screenshot"
 )
+

@@ -1,5 +1,10 @@
 package com.devson.nvplayer.ui.screen
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -36,6 +41,23 @@ fun GestureSettingsScreen(
 ) {
     val playbackSettings by settingsViewModel.playbackSettings.collectAsState()
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
+
+    val dirLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        uri?.let {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (e: Exception) {
+                // Ignore
+            }
+            settingsViewModel.updateScreenshotLocation(it.toString())
+        }
+    }
 
     var showDoubleTapDialog by remember { mutableStateOf(false) }
     var showSeekDurationDialog by remember { mutableStateOf(false) }
@@ -251,6 +273,17 @@ fun GestureSettingsScreen(
                     },
                     onClick = { showThreeFingerActionDialog = true }
                 )
+
+                if (playbackSettings.twoFingerAction == MultiFingerAction.SCREENSHOT ||
+                    playbackSettings.threeFingerAction == MultiFingerAction.SCREENSHOT) {
+                    GestureDivider()
+                    GestureRow(
+                        icon = Icons.Default.Folder,
+                        title = "Screenshot Save Location",
+                        subtitle = getDisplayPath(playbackSettings.screenshotLocation),
+                        onClick = { dirLauncher.launch(null) }
+                    )
+                }
             }
 
             Spacer(Modifier.height(24.dp))
@@ -357,7 +390,7 @@ fun GestureSettingsScreen(
             title = { Text("Two-Finger Action") },
             text = {
                 Column(Modifier.selectableGroup()) {
-                    MultiFingerAction.values().forEach { action ->
+                    listOf(MultiFingerAction.NONE, MultiFingerAction.PLAY_PAUSE, MultiFingerAction.FAST_PLAY, MultiFingerAction.MUTE, MultiFingerAction.SCREENSHOT, MultiFingerAction.PINCH_ZOOM).forEach { action ->
                         Row(
                             Modifier
                                 .fillMaxWidth()
@@ -407,7 +440,7 @@ fun GestureSettingsScreen(
             title = { Text("Three-Finger Action") },
             text = {
                 Column(Modifier.selectableGroup()) {
-                    MultiFingerAction.values().forEach { action ->
+                    listOf(MultiFingerAction.NONE, MultiFingerAction.PLAY_PAUSE, MultiFingerAction.FAST_PLAY, MultiFingerAction.MUTE, MultiFingerAction.SCREENSHOT, MultiFingerAction.PINCH_ZOOM).forEach { action ->
                         Row(
                             Modifier
                                 .fillMaxWidth()
@@ -689,4 +722,21 @@ private fun GestureSliderRow(
             modifier = Modifier.padding(top = 4.dp)
         )
     }
+}
+
+private fun getDisplayPath(location: String): String {
+    if (location.startsWith("content://")) {
+        return try {
+            val decoded = Uri.decode(location)
+            val lastColon = decoded.lastIndexOf(':')
+            if (lastColon != -1 && lastColon < decoded.length - 1) {
+                decoded.substring(lastColon + 1)
+            } else {
+                Uri.parse(location).lastPathSegment ?: location
+            }
+        } catch (e: Exception) {
+            location
+        }
+    }
+    return location
 }
