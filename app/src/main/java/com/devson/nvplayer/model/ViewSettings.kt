@@ -7,7 +7,7 @@ enum class DefaultScreen {
 data class ViewSettings(
     val recognizeNoMedia: Boolean = false,
     val showHiddenFiles: Boolean = false,
-    val showFloatingButton: Boolean = true,
+    val showQuickFab: Boolean = true,
     val selectByThumbnail: Boolean = false,
     val enableFabPreview: Boolean = true,
     val scanFoldersList: Set<String> = emptySet(),

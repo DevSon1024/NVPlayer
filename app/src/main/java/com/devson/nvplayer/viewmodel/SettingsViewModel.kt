@@ -115,8 +115,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { viewSettingsRepo.updateShowHiddenFiles(show) }
     }
 
-    fun updateShowFloatingButton(show: Boolean) {
-        viewModelScope.launch { viewSettingsRepo.updateShowFloatingButton(show) }
+    fun updateShowQuickFab(show: Boolean) {
+        viewModelScope.launch { viewSettingsRepo.updateShowQuickFab(show) }
     }
 
     fun updateSelectByThumbnail(select: Boolean) {

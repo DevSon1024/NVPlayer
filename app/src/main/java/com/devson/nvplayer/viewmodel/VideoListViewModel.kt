@@ -3,6 +3,7 @@ package com.devson.nvplayer.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.devson.nvplayer.data.repository.VideoRepository
+import com.devson.nvplayer.repository.ViewSettingsRepository
 import com.devson.nvplayer.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,7 +11,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
 
-class VideoListViewModel(private val repository: VideoRepository) : ViewModel() {
+class VideoListViewModel(
+    private val repository: VideoRepository,
+    private val viewSettingsRepo: ViewSettingsRepository
+) : ViewModel() {
 
     private val _videosByFolder = MutableStateFlow<Map<VideoFolder, List<Video>>>(emptyMap())
     val videosByFolder: StateFlow<Map<VideoFolder, List<Video>>> = _videosByFolder.asStateFlow()
@@ -27,8 +31,7 @@ class VideoListViewModel(private val repository: VideoRepository) : ViewModel() 
     private val _selectedFolder = MutableStateFlow<VideoFolder?>(null)
     val selectedFolder: StateFlow<VideoFolder?> = _selectedFolder.asStateFlow()
 
-    private val _viewSettings = MutableStateFlow(ViewSettings())
-    val viewSettings: StateFlow<ViewSettings> = _viewSettings.asStateFlow()
+    val viewSettings: StateFlow<ViewSettings> = viewSettingsRepo.viewSettingsFlow
 
     private val _currentExplorerPath = MutableStateFlow<String?>(null)
     val currentExplorerPath: StateFlow<String?> = _currentExplorerPath.asStateFlow()
@@ -188,73 +191,107 @@ class VideoListViewModel(private val repository: VideoRepository) : ViewModel() 
     // --- View Settings Update Callbacks ---
 
     fun updateViewMode(mode: ViewMode) {
-        _viewSettings.value = _viewSettings.value.copy(viewMode = mode)
+        viewModelScope.launch {
+            viewSettingsRepo.updateViewMode(mode)
+        }
         if (mode == ViewMode.FILES || mode == ViewMode.FOLDERS) {
             _selectedFolder.value = null
         }
     }
 
     fun updateLayoutMode(mode: LayoutMode) {
-        _viewSettings.value = _viewSettings.value.copy(layoutMode = mode)
+        viewModelScope.launch {
+            viewSettingsRepo.updateLayoutMode(mode)
+        }
     }
 
     fun updateGridColumns(cols: Int) {
-        _viewSettings.value = _viewSettings.value.copy(gridColumns = cols)
+        viewModelScope.launch {
+            viewSettingsRepo.updateGridColumns(cols)
+        }
     }
 
     fun updateSortField(field: SortField) {
-        _viewSettings.value = _viewSettings.value.copy(sortField = field)
+        viewModelScope.launch {
+            viewSettingsRepo.updateSortField(field)
+        }
     }
 
     fun updateSortDirection(dir: SortDirection) {
-        _viewSettings.value = _viewSettings.value.copy(sortDirection = dir)
+        viewModelScope.launch {
+            viewSettingsRepo.updateSortDirection(dir)
+        }
     }
 
     fun updateShowThumbnail(show: Boolean) {
-        _viewSettings.value = _viewSettings.value.copy(showThumbnail = show)
+        viewModelScope.launch {
+            viewSettingsRepo.updateShowThumbnail(show)
+        }
     }
 
     fun updateShowLength(show: Boolean) {
-        _viewSettings.value = _viewSettings.value.copy(showLength = show)
+        viewModelScope.launch {
+            viewSettingsRepo.updateShowLength(show)
+        }
     }
 
     fun updateShowFileExtension(show: Boolean) {
-        _viewSettings.value = _viewSettings.value.copy(showFileExtension = show)
+        viewModelScope.launch {
+            viewSettingsRepo.updateShowFileExtension(show)
+        }
     }
 
     fun updateShowPlayedTime(show: Boolean) {
-        _viewSettings.value = _viewSettings.value.copy(showPlayedTime = show)
+        viewModelScope.launch {
+            viewSettingsRepo.updateShowPlayedTime(show)
+        }
     }
 
     fun updateShowResolution(show: Boolean) {
-        _viewSettings.value = _viewSettings.value.copy(showResolution = show)
+        viewModelScope.launch {
+            viewSettingsRepo.updateShowResolution(show)
+        }
     }
 
     fun updateShowPath(show: Boolean) {
-        _viewSettings.value = _viewSettings.value.copy(showPath = show)
+        viewModelScope.launch {
+            viewSettingsRepo.updateShowPath(show)
+        }
     }
 
     fun updateShowSize(show: Boolean) {
-        _viewSettings.value = _viewSettings.value.copy(showSize = show)
+        viewModelScope.launch {
+            viewSettingsRepo.updateShowSize(show)
+        }
     }
 
     fun updateShowDate(show: Boolean) {
-        _viewSettings.value = _viewSettings.value.copy(showDate = show)
+        viewModelScope.launch {
+            viewSettingsRepo.updateShowDate(show)
+        }
     }
 
     fun updateDisplayLengthOverThumbnail(show: Boolean) {
-        _viewSettings.value = _viewSettings.value.copy(displayLengthOverThumbnail = show)
+        viewModelScope.launch {
+            viewSettingsRepo.updateDisplayLengthOverThumbnail(show)
+        }
     }
 
     fun updateShowHiddenFiles(show: Boolean) {
-        _viewSettings.value = _viewSettings.value.copy(showHiddenFiles = show)
+        viewModelScope.launch {
+            viewSettingsRepo.updateShowHiddenFiles(show)
+        }
     }
 
     fun updateRecognizeNoMedia(show: Boolean) {
-        _viewSettings.value = _viewSettings.value.copy(recognizeNoMedia = show)
+        viewModelScope.launch {
+            viewSettingsRepo.updateRecognizeNoMedia(show)
+        }
     }
 
     fun updateShowFrameRate(show: Boolean) {
-        _viewSettings.value = _viewSettings.value.copy(showFrameRate = show)
+        viewModelScope.launch {
+            viewSettingsRepo.updateShowFrameRate(show)
+        }
     }
 }

@@ -67,10 +67,11 @@ class MainActivity : ComponentActivity() {
 
         val mediaStoreHelper = MediaStoreHelper(this)
         val repository = VideoRepository(mediaStoreHelper)
+        val viewSettingsRepo = com.devson.nvplayer.repository.ViewSettingsRepository(applicationContext)
         
         homeViewModel = HomeViewModel(applicationContext, repository)
         settingsViewModel = ViewModelProvider(this)[SettingsViewModel::class.java]
-        videoListViewModel = VideoListViewModel(repository)
+        videoListViewModel = VideoListViewModel(repository, viewSettingsRepo)
         fileOpsViewModel = ViewModelProvider(this)[FileOperationsViewModel::class.java]
 
         val playerEngine = MPVPlayerEngine(applicationContext)

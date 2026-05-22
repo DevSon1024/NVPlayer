@@ -117,7 +117,7 @@ fun HomeScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            if (viewSettings.showFloatingButton) {
+            if (viewSettings.showQuickFab) {
                 val lastPlayedVideo = remember(history, allVideosFlat) {
                     val lastHistory = history.firstOrNull()
                     if (lastHistory != null) allVideosFlat.find { it.uri == lastHistory.uri } else null

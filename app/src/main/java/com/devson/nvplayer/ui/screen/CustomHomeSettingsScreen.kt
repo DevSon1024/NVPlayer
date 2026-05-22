@@ -111,11 +111,11 @@ fun CustomHomeSettingsScreen(
                     icon = Icons.Default.SmartButton,
                     title = "Show Floating Action Button",
                     subtitle = "Floating menu button to scan storage, view tools or search",
-                    checked = viewSettings.showFloatingButton,
-                    onCheckedChange = { settingsViewModel.updateShowFloatingButton(it) }
+                    checked = viewSettings.showQuickFab,
+                    onCheckedChange = { settingsViewModel.updateShowQuickFab(it) }
                 )
 
-                if (viewSettings.showFloatingButton) {
+                if (viewSettings.showQuickFab) {
                     CustomHomeDivider()
 
                     CustomHomeToggleRow(

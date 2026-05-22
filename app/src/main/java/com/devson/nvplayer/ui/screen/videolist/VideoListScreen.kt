@@ -478,7 +478,7 @@ fun VideoListScreen(
             }
         },
         floatingActionButton = {
-            if (viewSettings.showFloatingButton && !isSelectionActive) {
+            if (viewSettings.showQuickFab && !isSelectionActive) {
                 val allVideosFlat = remember(videosByFolder) { videosByFolder.values.flatten() }
 
                 val lastPlayedVideo = remember(history, selectedFolder, viewSettings.viewMode, currentExplorerPath, allVideosFlat) {
