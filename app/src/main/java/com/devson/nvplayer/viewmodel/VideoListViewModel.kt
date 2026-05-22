@@ -7,7 +7,10 @@ import com.devson.nvplayer.repository.ViewSettingsRepository
 import com.devson.nvplayer.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -16,8 +19,8 @@ class VideoListViewModel(
     private val viewSettingsRepo: ViewSettingsRepository
 ) : ViewModel() {
 
-    private val _videosByFolder = MutableStateFlow<Map<VideoFolder, List<Video>>>(emptyMap())
-    val videosByFolder: StateFlow<Map<VideoFolder, List<Video>>> = _videosByFolder.asStateFlow()
+    // --- Raw (unfiltered) scan result — populated once per disk scan ---
+    private val _rawVideosByFolder = MutableStateFlow<Map<VideoFolder, List<Video>>>(emptyMap())
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -42,8 +45,34 @@ class VideoListViewModel(
     private val _searchSuggestions = MutableStateFlow<List<String>>(emptyList())
     val searchSuggestions: StateFlow<List<String>> = _searchSuggestions.asStateFlow()
 
-    private var allVideosList = emptyList<Video>()
     private var currentSearchQuery = ""
+
+    /**
+     * Public, filtered view of videos by folder.
+     * Instantly re-derived in memory whenever raw data or settings change —
+     * no disk I/O is triggered by toggling showHiddenFiles / recognizeNoMedia.
+     */
+    val videosByFolder: StateFlow<Map<VideoFolder, List<Video>>> =
+        combine(_rawVideosByFolder, viewSettingsRepo.viewSettingsFlow) { raw, settings ->
+            raw.mapValues { (_, videos) ->
+                videos.filter { video ->
+                    val passHidden = settings.showHiddenFiles ||
+                        !video.path.split("/").any { seg -> seg.startsWith(".") && seg.length > 1 }
+                    val passNoMedia = !settings.recognizeNoMedia || !hasNoMediaAncestor(video.path)
+                    passHidden && passNoMedia
+                }
+            }.filterValues { it.isNotEmpty() }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** Returns true if any ancestor directory of [filePath] contains a .nomedia file. */
+    private fun hasNoMediaAncestor(filePath: String): Boolean {
+        var dir = File(filePath).parentFile
+        while (dir != null) {
+            if (File(dir, ".nomedia").exists()) return true
+            dir = dir.parentFile
+        }
+        return false
+    }
 
     fun loadVideos(forceRefresh: Boolean = false) {
         viewModelScope.launch {
@@ -52,7 +81,6 @@ class VideoListViewModel(
             try {
                 val folderItems = repository.getFolders()
                 val mappedVideos = mutableMapOf<VideoFolder, List<Video>>()
-                val allVideos = mutableListOf<Video>()
                 val totalFolders = folderItems.size
 
                 if (totalFolders > 0) {
@@ -87,14 +115,13 @@ class VideoListViewModel(
                                 name = folderItem.name
                             )
                             mappedVideos[videoFolder] = videos
-                            allVideos.addAll(videos)
                         }
                     }
                 }
 
                 _loadingProgress.value = 1f
-                allVideosList = allVideos
-                _videosByFolder.value = mappedVideos
+                // Store raw (unfiltered) — the combine flow handles filtering reactively
+                _rawVideosByFolder.value = mappedVideos
                 updateExplorerNodes()
                 performSearch()
             } catch (e: Exception) {
@@ -121,8 +148,8 @@ class VideoListViewModel(
         if (query.isBlank()) {
             _searchSuggestions.value = emptyList()
         } else {
-            // Generate suggestions based on matching titles
-            val matches = allVideosList.filter { it.title.contains(query, ignoreCase = true) }
+            val allVideos = videosByFolder.value.values.flatten()
+            val matches = allVideos.filter { it.title.contains(query, ignoreCase = true) }
                 .map { it.title }
                 .distinct()
                 .take(5)
@@ -133,15 +160,15 @@ class VideoListViewModel(
 
     fun getSearchResults(query: String): List<Video> {
         if (query.isBlank()) return emptyList()
-        return allVideosList.filter { it.title.contains(query, ignoreCase = true) }
+        return videosByFolder.value.values.flatten().filter { it.title.contains(query, ignoreCase = true) }
     }
 
     private fun performSearch() {
         if (currentSearchQuery.isBlank()) return
-        val filteredMapped = _videosByFolder.value.mapValues { (_, videos) ->
+        val filtered = _rawVideosByFolder.value.mapValues { (_, videos) ->
             videos.filter { it.title.contains(currentSearchQuery, ignoreCase = true) }
         }.filterValues { it.isNotEmpty() }
-        _videosByFolder.value = filteredMapped
+        _rawVideosByFolder.value = filtered
     }
 
     // --- Explorer Path Navigation ---
@@ -164,15 +191,12 @@ class VideoListViewModel(
         val currentPath = _currentExplorerPath.value
         val folders = mutableListOf<VideoFolder>()
         val videos = mutableListOf<Video>()
+        val snapshot = videosByFolder.value
 
         if (currentPath == null) {
-            // Root Explorer: list all unique top-level directories that have videos
-            _videosByFolder.value.keys.forEach { folder ->
-                folders.add(folder)
-            }
+            snapshot.keys.forEach { folder -> folders.add(folder) }
         } else {
-            // Show only videos in the selected folder, or folders matching sub-directories
-            _videosByFolder.value.forEach { (folder, videoList) ->
+            snapshot.forEach { (folder, videoList) ->
                 if (folder.id == currentPath) {
                     videos.addAll(videoList)
                 } else if (folder.id.startsWith(currentPath) && folder.id != currentPath) {
@@ -281,17 +305,25 @@ class VideoListViewModel(
         viewModelScope.launch {
             viewSettingsRepo.updateShowHiddenFiles(show)
         }
+        // No loadVideos() — combine flow re-filters _rawVideosByFolder instantly
     }
 
     fun updateRecognizeNoMedia(show: Boolean) {
         viewModelScope.launch {
             viewSettingsRepo.updateRecognizeNoMedia(show)
         }
+        // No loadVideos() — combine flow re-filters _rawVideosByFolder instantly
     }
 
     fun updateShowFrameRate(show: Boolean) {
         viewModelScope.launch {
             viewSettingsRepo.updateShowFrameRate(show)
+        }
+    }
+
+    fun updateSelectByThumbnail(select: Boolean) {
+        viewModelScope.launch {
+            viewSettingsRepo.updateSelectByThumbnail(select)
         }
     }
 }

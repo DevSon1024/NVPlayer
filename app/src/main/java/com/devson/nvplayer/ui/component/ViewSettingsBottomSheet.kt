@@ -233,6 +233,11 @@ fun ViewSettingsBottomSheet(
             //  Advanced 
             SettingsSectionLabel("Advanced")
             Spacer(modifier = Modifier.height(4.dp))
+            AdvancedToggleRow(
+                label = "Select via Thumbnail",
+                checked = settings.selectByThumbnail,
+                subtitle = "Click thumbnail to select video in list layout"
+            ) { viewModel.updateSelectByThumbnail(it) }
             AdvancedToggleRow("Length over Thumbnail", settings.displayLengthOverThumbnail) { viewModel.updateDisplayLengthOverThumbnail(it) }
             AdvancedToggleRow("Show Hidden Files", settings.showHiddenFiles) { viewModel.updateShowHiddenFiles(it) }
             AdvancedToggleRow("Recognize .nomedia", settings.recognizeNoMedia) { viewModel.updateRecognizeNoMedia(it) }
@@ -331,7 +336,12 @@ fun MetadataToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -
 
 // ADVANCED TOGGLE ROW
 @Composable
-fun AdvancedToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+fun AdvancedToggleRow(
+    label: String,
+    checked: Boolean,
+    subtitle: String? = null,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -341,7 +351,16 @@ fun AdvancedToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, style = MaterialTheme.typography.bodySmall)
+        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(label, style = MaterialTheme.typography.bodySmall)
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                )
+            }
+        }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -55,6 +56,7 @@ fun FolderGridItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit = {}
 ) {
+    val isHidden = folder.name.startsWith(".")
     val isDense = settings.gridColumns >= 3
     val newCount = remember(videos, historyMap) {
         videos.count { v -> getWatchState(
@@ -117,10 +119,11 @@ fun FolderGridItem(
                             fontWeight = FontWeight.SemiBold,
                             maxLines   = 2,
                             overflow   = TextOverflow.Ellipsis,
-                            color      = if (isSelected)
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            else
-                                MaterialTheme.colorScheme.onSurface
+                            color      = when {
+                                isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                isHidden   -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                                else       -> MaterialTheme.colorScheme.onSurface
+                            }
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         FolderMetadataChips(videos, settings, isGrid = false)
@@ -172,10 +175,11 @@ fun FolderGridItem(
                             fontWeight = FontWeight.SemiBold,
                             maxLines   = 1,
                             overflow   = TextOverflow.Ellipsis,
-                            color      = if (isSelected)
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            else
-                                MaterialTheme.colorScheme.onSurface
+                            color      = when {
+                                isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                isHidden   -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                                else       -> MaterialTheme.colorScheme.onSurface
+                            }
                         )
                         Spacer(modifier = Modifier.height(3.dp))
                         FolderMetadataChips(videos, settings, isGrid = true)
@@ -238,7 +242,7 @@ fun FolderGridItem(
             ) {
                 Text(
                     text       = folder.name,
-                    color      = Color.White,
+                    color      = if (isHidden) Color.White.copy(alpha = 0.5f) else Color.White,
                     style      = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines   = 1,

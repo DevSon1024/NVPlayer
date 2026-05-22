@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -132,6 +133,7 @@ fun FolderListItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit = {}
 ) {
+    val isHidden = folder.name.startsWith(".")
     val newCount = remember(videos, historyMap) {
         videos.count { v -> getWatchState(
             historyMap[v.uri]?.lastPositionMs ?: 0L,
@@ -154,7 +156,7 @@ fun FolderListItem(
         animationSpec = tween(180),
         label = "folderListBorder"
     )
- 
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -172,7 +174,8 @@ fun FolderListItem(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(10.dp),
+                    .padding(10.dp)
+                    .then(if (isHidden && !isSelected) Modifier.alpha(0.55f) else Modifier),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Folder thumbnail
@@ -185,9 +188,9 @@ fun FolderListItem(
                     )
                     NewCountBadge(newCount)
                 }
- 
+
                 Spacer(modifier = Modifier.width(14.dp))
- 
+
                 // Folder name + metadata
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -196,16 +199,17 @@ fun FolderListItem(
                         fontWeight = FontWeight.SemiBold,
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis,
-                        color      = if (isSelected)
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        else
-                            MaterialTheme.colorScheme.onSurface
+                        color      = when {
+                            isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                            isHidden   -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                            else       -> MaterialTheme.colorScheme.onSurface
+                        }
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     FolderMetadataChips(videos, settings)
                 }
             }
- 
+
             // Animated checkmark in top-right
             SelectionCheckmarkOverlay(visible = isSelected)
         }
