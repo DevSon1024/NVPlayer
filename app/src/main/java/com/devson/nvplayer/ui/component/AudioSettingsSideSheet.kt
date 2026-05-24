@@ -38,6 +38,8 @@ import kotlin.math.abs
 fun AudioSettingsSideSheet(
     visible: Boolean,
     audioTracks: List<TrackInfo>,
+    audioBoosterEnabled: Boolean,
+    onToggleAudioBooster: (Boolean) -> Unit,
     onSelectAudioTrack: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -160,6 +162,20 @@ fun AudioSettingsSideSheet(
                                 }
                             }
                         }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+
+                        // Section 2: Audio Effects / Boost
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SectionHeader(title = "Audio Effects")
+                            
+                            ToggleRow(
+                                title = "2x Audio Booster",
+                                description = "Double the maximum audio volume via software pre-amplification",
+                                checked = audioBoosterEnabled,
+                                onCheckedChange = onToggleAudioBooster
+                            )
+                        }
                     }
                 }
             }
@@ -226,5 +242,44 @@ private fun TrackItem(
                 modifier = Modifier.size(18.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        )
     }
 }

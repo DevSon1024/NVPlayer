@@ -161,11 +161,19 @@ fun PlayerControls(
                 }
             }
 
+            if (!isPortrait && showBatteryClockOverlay) {
+                Spacer(modifier = Modifier.width(12.dp))
+                BatteryAndClockOverlay()
+            }
+
             if (isPortrait) {
                 if (showBatteryClockOverlay) {
                     BatteryAndClockOverlay()
                 }
             } else {
+                if (showBatteryClockOverlay) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -235,41 +243,6 @@ fun PlayerControls(
                             fontSize = 13.sp
                         )
                     }
-                }
-
-                if (showScreenRotationButton) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.08f))
-                            .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
-                            .clickable {
-                                activity?.let { act ->
-                                    val currentOrientation = act.requestedOrientation
-                                    if (currentOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE ||
-                                        currentOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE) {
-                                        act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                    } else {
-                                        act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                                    }
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.ScreenRotation,
-                            contentDescription = "Rotate Screen",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                if (showBatteryClockOverlay) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    BatteryAndClockOverlay()
                 }
             }
         }
@@ -575,7 +548,8 @@ fun PlayerControls(
             // Timers Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 val durationText = if (showRemainingTime) {
                     "-${formatTime((duration - currentPosition).coerceAtLeast(0L))}"
@@ -588,6 +562,34 @@ fun PlayerControls(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
+                if (!isPortrait && showScreenRotationButton) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
+                            .clickable {
+                                activity?.let { act ->
+                                    val currentOrientation = act.requestedOrientation
+                                    if (currentOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE ||
+                                        currentOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE) {
+                                        act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                    } else {
+                                        act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                    }
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ScreenRotation,
+                            contentDescription = "Rotate Screen",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))

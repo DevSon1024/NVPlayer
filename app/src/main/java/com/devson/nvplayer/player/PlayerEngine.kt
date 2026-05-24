@@ -29,5 +29,6 @@ interface PlayerEngine {
     fun setSubtitleStyle(scale: Float, font: String, bold: Boolean)
     fun seekNextSubtitle()
     fun seekPrevSubtitle()
+    fun setAudioBoost(boost: Boolean)
     fun release()
 }

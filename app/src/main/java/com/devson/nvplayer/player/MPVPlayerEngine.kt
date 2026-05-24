@@ -279,6 +279,16 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
         }
     }
 
+    override fun setAudioBoost(boost: Boolean) {
+        Log.d("MPVPlayerEngine", "Setting audio boost: $boost")
+        try {
+            val volumeValue = if (boost) 200.0 else 100.0
+            MPVLib.setPropertyDouble("volume", volumeValue)
+        } catch (e: Exception) {
+            Log.e("MPVPlayerEngine", "Failed to set audio boost property", e)
+        }
+    }
+
     override fun release() {
         Log.d("MPVPlayerEngine", "Releasing MPVPlayerEngine resources")
         try {

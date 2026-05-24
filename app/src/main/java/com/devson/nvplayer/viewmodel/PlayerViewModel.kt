@@ -69,12 +69,16 @@ class PlayerViewModel(
     private val _savedVolume = MutableStateFlow(-1)
     val savedVolume: StateFlow<Int> = _savedVolume.asStateFlow()
 
+    private val _audioBoosterEnabled = MutableStateFlow(false)
+    val audioBoosterEnabled: StateFlow<Boolean> = _audioBoosterEnabled.asStateFlow()
+
     private val settingsRepo = com.devson.nvplayer.repository.PlaybackSettingsRepository(application.applicationContext)
     val playbackSettings = settingsRepo.playbackSettingsFlow
 
     init {
         _savedBrightness.value = playerPrefs.getFloat("brightness", 0.5f)
         _savedVolume.value = playerPrefs.getInt("volume", -1)
+        _audioBoosterEnabled.value = playerPrefs.getBoolean("audio_booster_enabled", false)
         viewModelScope.launch {
             playbackState.collect { state ->
                 if (state is PlayerState.Playing && !isPositionRestored) {
@@ -111,6 +115,12 @@ class PlayerViewModel(
     fun saveVolume(volume: Int) {
         playerPrefs.edit().putInt("volume", volume).apply()
         _savedVolume.value = volume
+    }
+
+    fun toggleAudioBooster(enabled: Boolean) {
+        _audioBoosterEnabled.value = enabled
+        playerPrefs.edit().putBoolean("audio_booster_enabled", enabled).apply()
+        playerEngine.setAudioBoost(enabled)
     }
 
     private var isVideoLoaded = false
@@ -176,6 +186,9 @@ class PlayerViewModel(
             // Set playback speed to customPlaybackSpeed preference value
             val customSpeed = settingsRepo.playbackSettingsFlow.value.customPlaybackSpeed
             setPlaybackSpeed(customSpeed)
+
+            // Apply saved audio boost
+            playerEngine.setAudioBoost(_audioBoosterEnabled.value)
         }
     }
 

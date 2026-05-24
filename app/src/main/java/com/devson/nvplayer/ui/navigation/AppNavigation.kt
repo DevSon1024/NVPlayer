@@ -256,6 +256,7 @@ fun AppNavigation(
             val currentSubtitleText by playerViewModel.currentSubtitleText.collectAsState()
             val subtitleTracks by playerViewModel.subtitleTracks.collectAsState()
             val audioTracks by playerViewModel.audioTracks.collectAsState()
+            val audioBoosterEnabled by playerViewModel.audioBoosterEnabled.collectAsState()
 
             PlayerScreen(
                 playbackState = playbackState,
@@ -286,6 +287,8 @@ fun AppNavigation(
                 currentSubtitleText = currentSubtitleText,
                 subtitleTracks = subtitleTracks,
                 audioTracks = audioTracks,
+                audioBoosterEnabled = audioBoosterEnabled,
+                onToggleAudioBooster = { playerViewModel.toggleAudioBooster(it) },
                 playbackSettings = playbackSettings,
                 onSelectSubtitleTrack = { playerViewModel.selectSubtitleTrack(it) },
                 onSelectAudioTrack = { playerViewModel.selectAudioTrack(it) },

@@ -99,6 +99,8 @@ fun PlayerScreen(
     currentSubtitleText: String = "",
     subtitleTracks: List<TrackInfo> = emptyList(),
     audioTracks: List<TrackInfo> = emptyList(),
+    audioBoosterEnabled: Boolean = false,
+    onToggleAudioBooster: (Boolean) -> Unit = {},
     playbackSettings: PlaybackSettings = PlaybackSettings(),
     onSelectSubtitleTrack: (Int) -> Unit = {},
     onSelectAudioTrack: (Int) -> Unit = {},
@@ -563,6 +565,8 @@ fun PlayerScreen(
         AudioSettingsSideSheet(
             visible = showAudioSettingsSideSheet,
             audioTracks = audioTracks,
+            audioBoosterEnabled = audioBoosterEnabled,
+            onToggleAudioBooster = onToggleAudioBooster,
             onSelectAudioTrack = onSelectAudioTrack,
             onDismiss = { showAudioSettingsSideSheet = false }
         )
