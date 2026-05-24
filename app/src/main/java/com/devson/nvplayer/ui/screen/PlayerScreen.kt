@@ -57,7 +57,7 @@ import android.provider.MediaStore
 import com.devson.nvplayer.ui.component.SubtitleSettingsSideSheet
 import com.devson.nvplayer.ui.component.AudioSettingsSideSheet
 import com.devson.nvplayer.ui.component.ComposeSubtitleOverlay
-import com.devson.nvplayer.ui.component.PlaybackSpeedSideSheet
+import com.devson.nvplayer.ui.component.PlayerSettingsSideSheet
 import androidx.activity.compose.BackHandler
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -122,13 +122,27 @@ fun PlayerScreen(
     onUpdateLongPressEnabled: (Boolean) -> Unit = {},
     onUpdateLongPressSpeed: (Float) -> Unit = {},
     onUpdateDoubleTapAction: (com.devson.nvplayer.repository.DoubleTapAction) -> Unit = {},
+    onUpdateOrientationMode: (com.devson.nvplayer.repository.OrientationMode) -> Unit = {},
+    onUpdateFullScreenMode: (com.devson.nvplayer.repository.FullScreenMode) -> Unit = {},
+    onUpdateSoftButtonMode: (com.devson.nvplayer.repository.SoftButtonMode) -> Unit = {},
+    onUpdateControlIconSize: (String) -> Unit = {},
+    onUpdateSeekBarStyle: (String) -> Unit = {},
+    onUpdateAutoPlayEnabled: (Boolean) -> Unit = {},
+    onUpdateShowSeekButtons: (Boolean) -> Unit = {},
+    onUpdateShowNextPrevButtons: (Boolean) -> Unit = {},
+    onUpdateShowElapsedTimeOverlay: (Boolean) -> Unit = {},
+    onUpdateShowRemainingTime: (Boolean) -> Unit = {},
+    onUpdateShowBatteryClockOverlay: (Boolean) -> Unit = {},
+    onUpdateShowScreenRotationButton: (Boolean) -> Unit = {},
+    onUpdatePauseWhenObstructed: (Boolean) -> Unit = {},
+    onUpdateKeepAwakeAlways: (Boolean) -> Unit = {},
     onTakeVideoScreenshot: () -> Unit = {}
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
     var isDragging by remember { mutableStateOf(false) }
     var showSubtitleSettingsSideSheet by remember { mutableStateOf(false) }
     var showAudioSettingsSideSheet by remember { mutableStateOf(false) }
-    var showPlaybackSpeedSideSheet by remember { mutableStateOf(false) }
+    var showPlayerSettingsSideSheet by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val windowInfo = LocalWindowInfo.current
 
@@ -505,7 +519,7 @@ fun PlayerScreen(
                         onPlayPauseToggle = onPlayPauseToggle,
                         onSeek = onSeek,
                         onSpeedClick = {
-                            showPlaybackSpeedSideSheet = true
+                            showPlayerSettingsSideSheet = true
                         },
                         onCycleSubtitle = {
                             showSubtitleSettingsSideSheet = true
@@ -571,8 +585,8 @@ fun PlayerScreen(
             onDismiss = { showAudioSettingsSideSheet = false }
         )
 
-        PlaybackSpeedSideSheet(
-            visible = showPlaybackSpeedSideSheet,
+        PlayerSettingsSideSheet(
+            visible = showPlayerSettingsSideSheet,
             currentSpeed = playbackSpeed,
             playbackSettings = playbackSettings,
             onSpeedSelected = { speed ->
@@ -583,7 +597,21 @@ fun PlayerScreen(
             onUpdateLongPressEnabled = onUpdateLongPressEnabled,
             onUpdateTapAndHoldSpeed = onUpdateTapAndHoldSpeed,
             onUpdateLongPressSpeed = onUpdateLongPressSpeed,
-            onDismiss = { showPlaybackSpeedSideSheet = false }
+            onUpdateOrientationMode = onUpdateOrientationMode,
+            onUpdateFullScreenMode = onUpdateFullScreenMode,
+            onUpdateSoftButtonMode = onUpdateSoftButtonMode,
+            onUpdateControlIconSize = onUpdateControlIconSize,
+            onUpdateSeekBarStyle = onUpdateSeekBarStyle,
+            onUpdateAutoPlayEnabled = onUpdateAutoPlayEnabled,
+            onUpdateShowSeekButtons = onUpdateShowSeekButtons,
+            onUpdateShowNextPrevButtons = onUpdateShowNextPrevButtons,
+            onUpdateShowElapsedTimeOverlay = onUpdateShowElapsedTimeOverlay,
+            onUpdateShowRemainingTime = onUpdateShowRemainingTime,
+            onUpdateShowBatteryClockOverlay = onUpdateShowBatteryClockOverlay,
+            onUpdateShowScreenRotationButton = onUpdateShowScreenRotationButton,
+            onUpdatePauseWhenObstructed = onUpdatePauseWhenObstructed,
+            onUpdateKeepAwakeAlways = onUpdateKeepAwakeAlways,
+            onDismiss = { showPlayerSettingsSideSheet = false }
         )
     }
 }

@@ -310,6 +310,20 @@ fun AppNavigation(
                 onUpdateLongPressEnabled = { settingsViewModel.updateLongPressEnabled(it) },
                 onUpdateLongPressSpeed = { settingsViewModel.updateLongPressSpeed(it) },
                 onUpdateDoubleTapAction = { settingsViewModel.updateDoubleTapAction(it) },
+                onUpdateOrientationMode = { settingsViewModel.updateOrientationMode(it) },
+                onUpdateFullScreenMode = { settingsViewModel.updateFullScreenMode(it) },
+                onUpdateSoftButtonMode = { settingsViewModel.updateSoftButtonMode(it) },
+                onUpdateControlIconSize = { settingsViewModel.updateControlIconSize(it) },
+                onUpdateSeekBarStyle = { settingsViewModel.updateSeekBarStyle(it) },
+                onUpdateAutoPlayEnabled = { settingsViewModel.updateAutoPlayEnabled(it) },
+                onUpdateShowSeekButtons = { settingsViewModel.updateShowSeekButtons(it) },
+                onUpdateShowNextPrevButtons = { settingsViewModel.updateShowNextPrevButtons(it) },
+                onUpdateShowElapsedTimeOverlay = { settingsViewModel.updateShowElapsedTimeOverlay(it) },
+                onUpdateShowRemainingTime = { settingsViewModel.updateShowRemainingTime(it) },
+                onUpdateShowBatteryClockOverlay = { settingsViewModel.updateShowBatteryClockOverlay(it) },
+                onUpdateShowScreenRotationButton = { settingsViewModel.updateShowScreenRotationButton(it) },
+                onUpdatePauseWhenObstructed = { settingsViewModel.updatePauseWhenObstructed(it) },
+                onUpdateKeepAwakeAlways = { settingsViewModel.updateKeepAwakeAlways(it) },
                 onTakeVideoScreenshot = { playerViewModel.takeVideoScreenshot() }
             )
         }

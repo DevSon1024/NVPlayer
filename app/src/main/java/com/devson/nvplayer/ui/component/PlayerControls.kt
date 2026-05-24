@@ -214,35 +214,19 @@ fun PlayerControls(
 
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(40.dp)
+                        .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.08f))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                        .clickable { onSpeedClick() }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
+                        .clickable { onSpeedClick() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Speed,
-                            contentDescription = "Playback Speed",
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        val speedText = if (playbackSpeed % 1.0f == 0.0f) {
-                            "${playbackSpeed.toInt()}x"
-                        } else {
-                            String.format(java.util.Locale.US, "%.2fx", playbackSpeed).trimEnd('0').trimEnd('.') + "x"
-                        }
-                        Text(
-                            text = speedText,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Rounded.Settings,
+                        contentDescription = "Player Settings",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }

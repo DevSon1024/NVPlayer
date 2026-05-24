@@ -158,11 +158,11 @@ fun SubtitleSettingsSideSheet(
                             SectionHeader(title = "Subtitle Tracks")
 
                             val isNoSubtitleSelected = subtitleTracks.none { it.selected }
-                            TrackItem(
-                                title = "None (Disabled)",
-                                isSelected = isNoSubtitleSelected,
-                                onClick = { onSelectSubtitleTrack(-1) }
-                            )
+                            // TrackItem(
+                            //     title = "None (Disabled)",
+                            //     isSelected = isNoSubtitleSelected,
+                            //     onClick = { onSelectSubtitleTrack(-1) }
+                            // )
 
                             subtitleTracks.forEach { track ->
                                 TrackItem(
