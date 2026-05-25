@@ -436,7 +436,7 @@ fun PlayerControls(
                 .fillMaxWidth()
                 .align(Alignment.BottomStart)
                 .navigationBarsPadding()
-                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                .padding(start = 16.dp, end = 16.dp, bottom = 20.dp)
         ) {
             if (isPortrait) {
                 Row(
@@ -671,7 +671,7 @@ fun PlayerControls(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
             val themePrimary = MaterialTheme.colorScheme.primary
 
@@ -696,9 +696,10 @@ fun PlayerControls(
                     }
                 },
                 valueRange = 0f..safeDuration,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(24.dp),
                 colors = SliderDefaults.colors(
                     thumbColor = themePrimary,
+                    
                     activeTrackColor = themePrimary,
                     inactiveTrackColor = Color.White.copy(alpha = 0.3f)
                 ),
