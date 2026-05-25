@@ -148,8 +148,6 @@ class PlayerViewModel(
                             val wasHwSupported = _isHwSupported.value
                             _isHwSupported.value = false
                             
-                            // Revert settings to SW automatically
-                            settingsRepo.updateDecoderMode(DecoderMode.SW)
                             playerEngine.setDecoder(DecoderMode.SW)
                             
                             if (wasHwSupported) {

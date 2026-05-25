@@ -156,6 +156,7 @@ fun PlayerScreen(
     onSelectChapter: (Int) -> Unit = {},
     currentDecoder: String = "AUTO",
     onUpdateDecoderMode: (DecoderMode) -> Unit = {},
+    isHwSupported: Boolean = true,
     onTakeVideoScreenshot: () -> Unit = {}
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
@@ -660,7 +661,7 @@ fun PlayerScreen(
 
         DecoderSideSheet(
             visible = showDecoderSideSheet,
-            currentMode = playbackSettings.decoderMode,
+            currentMode = if (!isHwSupported) DecoderMode.SW else playbackSettings.decoderMode,
             onSelectMode = { mode ->
                 onUpdateDecoderMode(mode)
             },

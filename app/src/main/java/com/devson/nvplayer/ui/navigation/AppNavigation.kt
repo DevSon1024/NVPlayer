@@ -30,6 +30,7 @@ import com.devson.nvplayer.viewmodel.SettingsViewModel
 import com.devson.nvplayer.viewmodel.VideoListViewModel
 import com.devson.nvplayer.viewmodel.FileOperationsViewModel
 import com.devson.nvplayer.model.ViewMode
+import com.devson.nvplayer.player.DecoderMode
 
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
@@ -252,6 +253,7 @@ fun AppNavigation(
             val seekBarStyle = playbackSettings.seekBarStyle
             val hasNext by playerViewModel.hasNext.collectAsState()
             val hasPrevious by playerViewModel.hasPrevious.collectAsState()
+            val isHwSupported by playerViewModel.isHwSupported.collectAsState()
 
             val currentSubtitleText by playerViewModel.currentSubtitleText.collectAsState()
             val subtitleTracks by playerViewModel.subtitleTracks.collectAsState()
@@ -337,7 +339,8 @@ fun AppNavigation(
                 onTakeVideoScreenshot = { playerViewModel.takeVideoScreenshot() },
                 chapters = chapters,
                 onSelectChapter = { playerViewModel.selectChapter(it) },
-                currentDecoder = playbackSettings.decoderMode.displayName,
+                currentDecoder = if (!isHwSupported) DecoderMode.SW.displayName else playbackSettings.decoderMode.displayName,
+                isHwSupported = isHwSupported,
                 onUpdateDecoderMode = { playerViewModel.updateDecoderMode(it) }
             )
         }
