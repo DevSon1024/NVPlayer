@@ -98,7 +98,7 @@ fun GestureOverlay(
 
     var lastUnmutedVolume by remember { mutableIntStateOf(maxVolume / 2) }
     var muteOverlayVisible by remember { mutableStateOf(false) }
-    var muteOverlayIsMuted by remember { mutableStateOf(false) }
+    var isMutedState by remember { mutableStateOf(false) }
     var muteOverlayTick by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(muteOverlayTick) {
@@ -187,7 +187,8 @@ fun GestureOverlay(
         onLastUnmutedVolumeChanged: (Int) -> Unit,
         onShowMuteIcon: (Boolean) -> Unit,
         onTakeVideoScreenshot: () -> Unit,
-        onTriggerMuteOverlay: (Boolean) -> Unit
+        onTriggerMuteOverlay: (Boolean) -> Unit,
+        isMuted: Boolean
     ) {
         when (action) {
             MultiFingerAction.PLAY_PAUSE -> {
@@ -205,16 +206,18 @@ fun GestureOverlay(
                 }
             }
             MultiFingerAction.MUTE -> {
-                val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                if (currentVol > 0) {
-                    onLastUnmutedVolumeChanged(currentVol)
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0)
-                    onShowMuteIcon(true)
-                    onTriggerMuteOverlay(true)
-                } else {
+                if (isMuted) {
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, lastUnmutedVolume, 0)
                     onShowMuteIcon(false)
                     onTriggerMuteOverlay(false)
+                } else {
+                    val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                    if (currentVol > 0) {
+                        onLastUnmutedVolumeChanged(currentVol)
+                    }
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0)
+                    onShowMuteIcon(true)
+                    onTriggerMuteOverlay(true)
                 }
             }
             MultiFingerAction.SCREENSHOT -> {
@@ -255,6 +258,7 @@ fun GestureOverlay(
                     var isLeftHalfDrag = false
                     var lastDragY = 0f
                     var multiFingerToastJob: Job? = null
+                    var targetSeekPos = 0L
 
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
@@ -364,6 +368,8 @@ fun GestureOverlay(
                                                 onSetAudioBoostVolumeState.value(boostVolPercent)
                                                 currentVolumePercent = (currentVolumeFloat * 100).toInt()
                                             }
+                                            isMutedState = false
+                                            onShowMuteIcon(false)
                                         }
                                     }
                                     dragChange.consume()
@@ -404,9 +410,10 @@ fun GestureOverlay(
                                         onShowMuteIcon = onShowMuteIcon,
                                         onTakeVideoScreenshot = onTakeVideoScreenshot,
                                         onTriggerMuteOverlay = { isMuted ->
-                                            muteOverlayIsMuted = isMuted
+                                            isMutedState = isMuted
                                             muteOverlayTick++
-                                        }
+                                        },
+                                        isMuted = isMutedState
                                     )
                                 } else if (dragStarted) {
                                     if (isSeekDrag) {
@@ -440,11 +447,15 @@ fun GestureOverlay(
                                         val width = size.width
                                         val x = tapOffset.x
 
+                                        if (!leftRippleActive && !rightRippleActive) {
+                                            targetSeekPos = currentPositionState.value
+                                        }
+
                                         when (settings.doubleTapAction) {
                                             DoubleTapAction.BOTH -> {
                                                 if (x < width * 0.4f) {
-                                                    val newPos = (currentPositionState.value - doubleTapSeekDurationMs).coerceAtLeast(0L)
-                                                    onSeekState.value(newPos, true)
+                                                    targetSeekPos = (targetSeekPos - doubleTapSeekDurationMs).coerceIn(0L, durationState.value)
+                                                    onSeekState.value(targetSeekPos, true)
                                                     leftClearJob?.cancel()
                                                     leftAccumulatedMs += doubleTapSeekDurationMs
                                                     leftRippleTick++
@@ -455,8 +466,8 @@ fun GestureOverlay(
                                                         leftRippleActive = false
                                                     }
                                                 } else if (x > width * 0.6f) {
-                                                    val newPos = (currentPositionState.value + doubleTapSeekDurationMs).coerceAtMost(durationState.value)
-                                                    onSeekState.value(newPos, true)
+                                                    targetSeekPos = (targetSeekPos + doubleTapSeekDurationMs).coerceIn(0L, durationState.value)
+                                                    onSeekState.value(targetSeekPos, true)
                                                     rightClearJob?.cancel()
                                                     rightAccumulatedMs += doubleTapSeekDurationMs
                                                     rightRippleTick++
@@ -474,8 +485,8 @@ fun GestureOverlay(
                                                 onPlayPauseToggleState.value()
                                             }
                                             DoubleTapAction.FAST_FORWARD -> {
-                                                val newPos = (currentPositionState.value + doubleTapSeekDurationMs).coerceAtMost(durationState.value)
-                                                onSeekState.value(newPos, true)
+                                                targetSeekPos = (targetSeekPos + doubleTapSeekDurationMs).coerceIn(0L, durationState.value)
+                                                onSeekState.value(targetSeekPos, true)
                                                 rightClearJob?.cancel()
                                                 rightAccumulatedMs += doubleTapSeekDurationMs
                                                 rightRippleTick++
@@ -487,8 +498,8 @@ fun GestureOverlay(
                                                 }
                                             }
                                             DoubleTapAction.REWIND -> {
-                                                val newPos = (currentPositionState.value - doubleTapSeekDurationMs).coerceAtLeast(0L)
-                                                onSeekState.value(newPos, true)
+                                                targetSeekPos = (targetSeekPos - doubleTapSeekDurationMs).coerceIn(0L, durationState.value)
+                                                onSeekState.value(targetSeekPos, true)
                                                 leftClearJob?.cancel()
                                                 leftAccumulatedMs += doubleTapSeekDurationMs
                                                 leftRippleTick++
@@ -730,7 +741,7 @@ fun GestureOverlay(
                     .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
             ) {
                 Icon(
-                    imageVector = if (muteOverlayIsMuted) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp,
+                    imageVector = if (isMutedState) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp,
                     contentDescription = "Mute Toggle",
                     tint = Color.White,
                     modifier = Modifier.size(40.dp)

@@ -390,7 +390,7 @@ class PlayerViewModel(
 
     fun savePlaybackProgress() {
         val uri = _currentUri.value ?: return
-        val pos = currentPosition.value
+        var pos = currentPosition.value
         val dur = duration.value
         
         // If the video is close to the end (e.g. less than 5 seconds remaining, or past 98% of duration),
@@ -402,7 +402,13 @@ class PlayerViewModel(
             return
         }
         
-        if (pos > 0) {
+        var shouldSave = pos > 0
+        if (dur > 0 && pos > dur * 0.95) {
+            pos = 0L
+            shouldSave = true
+        }
+        
+        if (shouldSave) {
             val prefs = getApplication<Application>().getSharedPreferences("watch_history_prefs", Context.MODE_PRIVATE)
             prefs.edit().putLong(uri.toString(), pos).apply()
             val timePrefs = getApplication<Application>().getSharedPreferences("watch_history_timestamps_prefs", Context.MODE_PRIVATE)
