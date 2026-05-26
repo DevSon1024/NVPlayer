@@ -1,5 +1,6 @@
 package com.devson.nvplayer.viewmodel
 
+import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -11,7 +12,14 @@ import com.devson.nvplayer.player.PlayerState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+enum class FilterMode {
+    ALL, PORTRAIT, LANDSCAPE
+}
 
 /**
  * ViewModel for the Reels/Shorts-style vertical video feed.
@@ -23,7 +31,8 @@ import kotlinx.coroutines.launch
  */
 class FeedViewModel(
     // Shared engine owned by PlayerViewModel / MainActivity. Do NOT release it here.
-    val engine: MPVPlayerEngine
+    val engine: MPVPlayerEngine,
+    private val context: Context
 ) : ViewModel() {
 
     var skipPauseOnDispose = false
@@ -32,9 +41,33 @@ class FeedViewModel(
         private const val TAG = "FeedViewModel"
     }
 
+    private val prefs = context.getSharedPreferences("feed_settings_prefs", Context.MODE_PRIVATE)
+
     // Video list shown in the pager
     private val _videos = MutableStateFlow<List<Video>>(emptyList())
     val videos: StateFlow<List<Video>> = _videos.asStateFlow()
+
+    // Add filter state
+    private val _filterMode = MutableStateFlow(
+        FilterMode.valueOf(prefs.getString("filter_mode", FilterMode.ALL.name) ?: FilterMode.ALL.name)
+    )
+    val filterMode: StateFlow<FilterMode> = _filterMode.asStateFlow()
+
+    // Add derived filteredVideos StateFlow
+    val filteredVideos: StateFlow<List<Video>> = combine(
+        _videos,
+        _filterMode
+    ) { videosList, mode ->
+        when (mode) {
+            FilterMode.ALL -> videosList
+            FilterMode.PORTRAIT -> videosList.filter { it.height > it.width }
+            FilterMode.LANDSCAPE -> videosList.filter { it.width > it.height }
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
 
     // Mirror engine state for the UI
     val playbackState: StateFlow<PlayerState> = engine.playbackState
@@ -44,6 +77,9 @@ class FeedViewModel(
     private val _currentIndex = MutableStateFlow(-1)
     val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
 
+    // Which video URI is currently playing
+    private val _currentVideoUri = MutableStateFlow<String?>(null)
+
     val currentPosition: StateFlow<Long> = engine.currentPosition
     val duration: StateFlow<Long> = engine.duration
 
@@ -52,14 +88,26 @@ class FeedViewModel(
         Log.d(TAG, "Feed loaded with ${list.size} videos")
     }
 
+    fun setFilterMode(mode: FilterMode) {
+        _filterMode.value = mode
+        prefs.edit().putString("filter_mode", mode.name).apply()
+    }
+
     /** Called when pagerState.settledPage changes. Loads and plays the new page. */
     fun onPageSettled(index: Int) {
-        val list = _videos.value
+        val list = filteredVideos.value
+        if (list.isEmpty()) {
+            _currentVideoUri.value = null
+            _currentIndex.value = -1
+            pause()
+            return
+        }
         if (index < 0 || index >= list.size) return
-        if (_currentIndex.value == index) return
-
-        _currentIndex.value = index
         val video = list[index]
+        if (_currentVideoUri.value == video.uri) return
+
+        _currentVideoUri.value = video.uri
+        _currentIndex.value = index
         Log.d(TAG, "Page settled -> index=$index uri=${video.uri}")
 
         viewModelScope.launch {
@@ -85,13 +133,17 @@ class FeedViewModel(
     }
 
     /** Factory that injects the shared engine instead of creating a new one. */
-    class Factory(private val engine: MPVPlayerEngine) : ViewModelProvider.Factory {
+    class Factory(
+        private val engine: MPVPlayerEngine,
+        private val context: Context
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(FeedViewModel::class.java)) {
-                return FeedViewModel(engine) as T
+                return FeedViewModel(engine, context) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
     }
 }
+

@@ -45,6 +45,9 @@ import com.devson.nvplayer.player.MPVSurfaceView
 import com.devson.nvplayer.player.PlayerState
 import com.devson.nvplayer.util.formatDuration
 import com.devson.nvplayer.viewmodel.FeedViewModel
+import com.devson.nvplayer.viewmodel.FilterMode
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.FilterList
 import kotlinx.coroutines.delay
 
 // 
@@ -82,8 +85,9 @@ fun FeedScreen(
     onBack: () -> Unit = {},
     onPlayVideoInPlayer: (Video, List<Video>) -> Unit = { _, _ -> }
 ) {
+    val context = LocalContext.current
     val viewModel: FeedViewModel = viewModel(
-        factory = FeedViewModel.Factory(engine)
+        factory = FeedViewModel.Factory(engine, context.applicationContext)
     )
 
     var controlsVisible by remember { mutableStateOf(true) }
@@ -93,17 +97,19 @@ fun FeedScreen(
         viewModel.setVideos(videos)
     }
 
+    val filteredVideos by viewModel.filteredVideos.collectAsState()
+
     val pagerState = rememberPagerState(
-        initialPage = startIndex.coerceIn(0, (videos.size - 1).coerceAtLeast(0)),
-        pageCount   = { videos.size }
+        initialPage = startIndex.coerceIn(0, (filteredVideos.size - 1).coerceAtLeast(0)),
+        pageCount   = { filteredVideos.size }
     )
 
     val isPlaying    by viewModel.isPlaying.collectAsState()
     val playerState  by viewModel.playbackState.collectAsState()
     val currentIndex by viewModel.currentIndex.collectAsState()
 
-    //  Auto-play on settle 
-    LaunchedEffect(pagerState.settledPage) {
+    //  Auto-play on settle or filter change
+    LaunchedEffect(pagerState.settledPage, filteredVideos) {
         viewModel.onPageSettled(pagerState.settledPage)
     }
 
@@ -137,7 +143,7 @@ fun FeedScreen(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        if (videos.isEmpty()) {
+        if (filteredVideos.isEmpty()) {
             FeedEmptyState()
             return@Box
         }
@@ -146,7 +152,7 @@ fun FeedScreen(
             state    = pagerState,
             modifier = Modifier.fillMaxSize()
         ) { pageIndex ->
-            val video      = videos[pageIndex]
+            val video      = filteredVideos[pageIndex]
             // Use settledPage (not currentPage) so the surface is only attached/detached
             // once the scroll animation is fully done. Using currentPage would destroy and
             // recreate the MPVSurfaceView mid-swipe, causing a GPU spike on every scroll.
@@ -163,7 +169,7 @@ fun FeedScreen(
                 onSpeedChange = { speed -> viewModel.setPlaybackSpeed(speed) },
                 onTitleClick = {
                     viewModel.skipPauseOnDispose = true
-                    onPlayVideoInPlayer(video, videos)
+                    onPlayVideoInPlayer(video, filteredVideos)
                 },
                 onTogglePlay = { viewModel.togglePlayback() }
             )
@@ -176,8 +182,11 @@ fun FeedScreen(
             exit = fadeOut(tween(200)),
             modifier = Modifier.align(Alignment.TopCenter)
         ) {
+            val filterMode by viewModel.filterMode.collectAsState()
             FeedTopBar(
-                onBack   = onBack
+                onBack = onBack,
+                currentFilterMode = filterMode,
+                onFilterModeChange = { viewModel.setFilterMode(it) }
             )
         }
 
@@ -191,7 +200,7 @@ fun FeedScreen(
                 .padding(end = 12.dp)
         ) {
             FeedPageIndicator(
-                total    = videos.size,
+                total    = filteredVideos.size,
                 current  = pagerState.currentPage
             )
         }
@@ -485,8 +494,12 @@ private fun FeedPage(
 @Composable
 private fun FeedTopBar(
     onBack: () -> Unit,
+    currentFilterMode: FilterMode,
+    onFilterModeChange: (FilterMode) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var expanded by remember { mutableStateOf(false) }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -508,6 +521,60 @@ private fun FeedTopBar(
             fontSize   = 20.sp,
             modifier   = Modifier.padding(start = 4.dp)
         )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Box {
+            IconButton(onClick = { expanded = true }) {
+                Icon(
+                    imageVector = Icons.Default.FilterList,
+                    contentDescription = "Filter",
+                    tint = Color.White
+                )
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+            ) {
+                DropdownMenuItem(
+                    text = { Text("All") },
+                    onClick = {
+                        onFilterModeChange(FilterMode.ALL)
+                        expanded = false
+                    },
+                    leadingIcon = {
+                        if (currentFilterMode == FilterMode.ALL) {
+                            Icon(Icons.Default.Check, contentDescription = null)
+                        }
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Portrait") },
+                    onClick = {
+                        onFilterModeChange(FilterMode.PORTRAIT)
+                        expanded = false
+                    },
+                    leadingIcon = {
+                        if (currentFilterMode == FilterMode.PORTRAIT) {
+                            Icon(Icons.Default.Check, contentDescription = null)
+                        }
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Landscape") },
+                    onClick = {
+                        onFilterModeChange(FilterMode.LANDSCAPE)
+                        expanded = false
+                    },
+                    leadingIcon = {
+                        if (currentFilterMode == FilterMode.LANDSCAPE) {
+                            Icon(Icons.Default.Check, contentDescription = null)
+                        }
+                    }
+                )
+            }
+        }
     }
 }
 
