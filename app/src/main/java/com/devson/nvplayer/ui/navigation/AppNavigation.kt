@@ -96,8 +96,8 @@ fun AppNavigation(
                 viewModel = videoListViewModel,
                 fileOpsViewModel = fileOpsViewModel,
                 homeViewModel = homeViewModel,
-                onFolderClick = { folderName ->
-                    val folder = videoListViewModel.videosByFolder.value.keys.find { it.name == folderName }
+                onFolderClick = { folderId ->
+                    val folder = videoListViewModel.videosByFolder.value.keys.find { it.id == folderId }
                     videoListViewModel.selectFolder(folder)
                     videoListViewModel.updateViewMode(ViewMode.ALL_FOLDERS)
                     navController.navigate("video_list")

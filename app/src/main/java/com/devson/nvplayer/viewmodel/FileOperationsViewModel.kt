@@ -13,6 +13,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.devson.nvplayer.data.media.FileTransferOps
 import com.devson.nvplayer.data.model.VideoItem
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,9 +68,28 @@ class FileOperationsViewModel(application: Application) : AndroidViewModel(appli
     private val _pendingDeletionsFlow = MutableSharedFlow<List<Uri>>()
     val pendingDeletionsFlow: SharedFlow<List<Uri>> = _pendingDeletionsFlow.asSharedFlow()
 
+    private val _showOverwriteDialog = MutableStateFlow(false)
+    val showOverwriteDialog: StateFlow<Boolean> = _showOverwriteDialog.asStateFlow()
+
+    private var pendingVideos: List<VideoItem> = emptyList()
+    private var pendingDestRelativePath: String = ""
+
     // PUBLIC API
 
-    fun moveVideos(context: Context, videos: List<VideoItem>, destRelativePath: String) {
+    fun moveVideos(context: Context, videos: List<VideoItem>, destRelativePath: String, overwrite: Boolean = false) {
+        if (!overwrite) {
+            val hasConflict = videos.any { video ->
+                val sourceFile = java.io.File(video.path)
+                FileTransferOps.isFileConflict(context, destRelativePath, sourceFile.name)
+            }
+            if (hasConflict) {
+                pendingVideos = videos
+                pendingDestRelativePath = destRelativePath
+                _showOverwriteDialog.value = true
+                return
+            }
+        }
+
         viewModelScope.launch {
             _isTransferring.value = true
             _operationInProgress.value = true
@@ -80,11 +100,14 @@ class FileOperationsViewModel(application: Application) : AndroidViewModel(appli
                 for (video in videos) {
                     _transferringFileName.value = video.title
                     _transferPercentage.value = 0
-                    val result = FileTransferOps.copyVideoScoped(context, video, destRelativePath) { progress ->
+                    val result = FileTransferOps.moveVideoScoped(context, video, destRelativePath, overwrite) { progress ->
                         _transferPercentage.value = progress
                     }
                     if (result.isSuccess) {
-                        pendingDeletions.add(video.uri)
+                        val moveResult = result.getOrThrow()
+                        if (!moveResult.wasDirectMove) {
+                            pendingDeletions.add(video.uri)
+                        }
                         successCount++
                     } else {
                         failCount++
@@ -96,6 +119,55 @@ class FileOperationsViewModel(application: Application) : AndroidViewModel(appli
                 _operationResult.value = buildOpResult("Moved", successCount, failCount)
             } catch (e: Exception) {
                 _operationResult.value = "Move failed: ${e.localizedMessage}"
+            } finally {
+                _isTransferring.value = false
+                _transferringFileName.value = null
+                _transferPercentage.value = 0
+                _operationInProgress.value = false
+                _needsRefresh.value = true
+            }
+        }
+    }
+
+    fun confirmOverwrite(context: Context) {
+        _showOverwriteDialog.value = false
+        val videos = pendingVideos
+        val destPath = pendingDestRelativePath
+        pendingVideos = emptyList()
+        pendingDestRelativePath = ""
+        if (videos.isNotEmpty() && destPath.isNotEmpty()) {
+            moveVideos(context, videos, destPath, overwrite = true)
+        }
+    }
+
+    fun cancelOverwrite() {
+        _showOverwriteDialog.value = false
+        pendingVideos = emptyList()
+        pendingDestRelativePath = ""
+    }
+
+    fun copyVideos(context: Context, videos: List<VideoItem>, destRelativePath: String) {
+        viewModelScope.launch {
+            _isTransferring.value = true
+            _operationInProgress.value = true
+            var successCount = 0
+            var failCount = 0
+            try {
+                for (video in videos) {
+                    _transferringFileName.value = video.title
+                    _transferPercentage.value = 0
+                    val result = FileTransferOps.copyVideoScoped(context, video, destRelativePath, overwrite = false) { progress ->
+                        _transferPercentage.value = progress
+                    }
+                    if (result.isSuccess) {
+                        successCount++
+                    } else {
+                        failCount++
+                    }
+                }
+                _operationResult.value = buildOpResult("Copied", successCount, failCount)
+            } catch (e: Exception) {
+                _operationResult.value = "Copy failed: ${e.localizedMessage}"
             } finally {
                 _isTransferring.value = false
                 _transferringFileName.value = null
@@ -360,6 +432,7 @@ class FileOperationsViewModel(application: Application) : AndroidViewModel(appli
                 _operationResult.value = "Copy failed: ${e.localizedMessage}"
             } finally {
                 _operationInProgress.value = false
+                _needsRefresh.value = true
             }
         }
     }
@@ -404,6 +477,7 @@ class FileOperationsViewModel(application: Application) : AndroidViewModel(appli
                 _operationResult.value = "Move failed: ${e.localizedMessage}"
             } finally {
                 _operationInProgress.value = false
+                _needsRefresh.value = true
             }
         }
     }
@@ -463,6 +537,7 @@ class FileOperationsViewModel(application: Application) : AndroidViewModel(appli
                 _operationResult.value = "Copy failed: ${e.localizedMessage}"
             } finally {
                 _operationInProgress.value = false
+                _needsRefresh.value = true
             }
         }
     }
@@ -522,6 +597,7 @@ class FileOperationsViewModel(application: Application) : AndroidViewModel(appli
                 _operationResult.value = "Move failed: ${e.localizedMessage}"
             } finally {
                 _operationInProgress.value = false
+                _needsRefresh.value = true
             }
         }
     }
@@ -548,6 +624,9 @@ class FileOperationsViewModel(application: Application) : AndroidViewModel(appli
             val deletedCount = uris.size - failedUris.size
             if (failedUris.isEmpty()) {
                 _operationResult.value = "Successfully deleted ${deletedCount} videos."
+                _needsRefresh.value = true
+            } else if (deletedCount > 0) {
+                _needsRefresh.value = true
             }
             // If there are failed URIs with a RecoverableSecurityException,
             // UI will see pendingIntentSender and launch it.
@@ -565,6 +644,70 @@ class FileOperationsViewModel(application: Application) : AndroidViewModel(appli
             } catch (e: RecoverableSecurityException) {
                 pendingAction = PendingFileAction.Rename(uri, newName)
                 _pendingIntentSender.value = e.userAction.actionIntent.intentSender
+            }
+        }
+    }
+
+    private fun resolveUrisToVideoItems(context: Context, uris: List<Uri>): List<VideoItem> {
+        val list = mutableListOf<VideoItem>()
+        val projection = arrayOf(
+            MediaStore.Video.Media._ID,
+            MediaStore.Video.Media.DISPLAY_NAME,
+            MediaStore.Video.Media.DURATION,
+            MediaStore.Video.Media.DATA,
+            MediaStore.Video.Media.SIZE,
+            MediaStore.Video.Media.WIDTH,
+            MediaStore.Video.Media.HEIGHT
+        )
+        for (uri in uris) {
+            try {
+                context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID))
+                        val title = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)) ?: "Unknown"
+                        val duration = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION))
+                        val data = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)) ?: ""
+                        val size = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE))
+                        val width = cursor.getInt(cursor.getColumnIndexOrThrow(MediaStore.Video.Media.WIDTH))
+                        val height = cursor.getInt(cursor.getColumnIndexOrThrow(MediaStore.Video.Media.HEIGHT))
+                        val contentUri = android.content.ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
+                        val folderName = java.io.File(data).parentFile?.name ?: "Unknown"
+                        list.add(
+                            VideoItem(
+                                uri = contentUri,
+                                title = title,
+                                duration = duration,
+                                folderName = folderName,
+                                path = data,
+                                thumbnailUri = contentUri,
+                                size = size,
+                                width = width,
+                                height = height
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("FileOperationsViewModel", "Failed to resolve URI to VideoItem: $uri", e)
+            }
+        }
+        return list
+    }
+
+    fun moveVideosByUri(context: Context, uris: List<Uri>, destRelativePath: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val videos = resolveUrisToVideoItems(context, uris)
+            withContext(Dispatchers.Main) {
+                moveVideos(context, videos, destRelativePath)
+            }
+        }
+    }
+
+    fun copyVideosByUri(context: Context, uris: List<Uri>, destRelativePath: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val videos = resolveUrisToVideoItems(context, uris)
+            withContext(Dispatchers.Main) {
+                copyVideos(context, videos, destRelativePath)
             }
         }
     }

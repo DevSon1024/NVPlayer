@@ -13,7 +13,7 @@ import java.io.File
 
 class MediaStoreHelper(private val context: Context) {
 
-    suspend fun getAllVideos(): List<VideoItem> = withContext(Dispatchers.IO) {
+    suspend fun getAllVideos(blacklistedFolders: List<String> = emptyList()): List<VideoItem> = withContext(Dispatchers.IO) {
         val videos = mutableListOf<VideoItem>()
         val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
         val thumbnailsMap = getThumbnailsMap(context)
@@ -30,11 +30,22 @@ class MediaStoreHelper(private val context: Context) {
 
         val sortOrder = "${MediaStore.Video.Media.DATE_ADDED} DESC"
 
+        var selection: String? = null
+        var selectionArgs: Array<String>? = null
+
+        if (blacklistedFolders.isNotEmpty()) {
+            selection = blacklistedFolders.joinToString(" AND ") { "${MediaStore.Video.Media.DATA} NOT LIKE ?" }
+            selectionArgs = blacklistedFolders.map { path ->
+                val cleanPath = if (path.endsWith("/")) path else "$path/"
+                "$cleanPath%"
+            }.toTypedArray()
+        }
+
         context.contentResolver.query(
             collection,
             projection,
-            null,
-            null,
+            selection,
+            selectionArgs,
             sortOrder
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
@@ -49,7 +60,7 @@ class MediaStoreHelper(private val context: Context) {
                 val id = cursor.getLong(idColumn)
                 val title = cursor.getString(nameColumn) ?: "Unknown"
                 val duration = cursor.getLong(durationColumn)
-                val data = cursor.getString(dataColumn)
+                val data = cursor.getString(dataColumn) ?: ""
                 val size = cursor.getLong(sizeColumn)
                 val width = cursor.getInt(widthColumn)
                 val height = cursor.getInt(heightColumn)
@@ -80,7 +91,7 @@ class MediaStoreHelper(private val context: Context) {
      * Retrieves videos that are in the system trash (MediaStore IS_TRASHED flag).
      * Returns empty list on platforms where the column is unavailable.
      */
-    suspend fun getTrashedVideos(): List<VideoItem> = withContext(Dispatchers.IO) {
+    suspend fun getTrashedVideos(blacklistedFolders: List<String> = emptyList()): List<VideoItem> = withContext(Dispatchers.IO) {
         // The IS_TRASHED column is available on API 30+.
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
             return@withContext emptyList()
@@ -98,11 +109,28 @@ class MediaStoreHelper(private val context: Context) {
             MediaStore.Video.Media.WIDTH,
             MediaStore.Video.Media.HEIGHT
         )
+
+        val selectionBuilder = StringBuilder("${MediaStore.Video.Media.IS_TRASHED}=1")
+        var selectionArgs: Array<String>? = null
+        if (blacklistedFolders.isNotEmpty()) {
+            blacklistedFolders.forEach { _ ->
+                selectionBuilder.append(" AND ${MediaStore.Video.Media.DATA} NOT LIKE ?")
+            }
+            selectionArgs = blacklistedFolders.map { path ->
+                val cleanPath = if (path.endsWith("/")) path else "$path/"
+                "$cleanPath%"
+            }.toTypedArray()
+        }
+
         val queryArgs = android.os.Bundle().apply {
             putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_ONLY)
-            putString(ContentResolver.QUERY_ARG_SQL_SELECTION, "${MediaStore.Video.Media.IS_TRASHED}=1")
+            putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selectionBuilder.toString())
+            if (selectionArgs != null) {
+                putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, selectionArgs)
+            }
             putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER, "${MediaStore.Video.Media.DATE_ADDED} DESC")
         }
+
         context.contentResolver.query(
             collection,
             projection,
@@ -116,17 +144,20 @@ class MediaStoreHelper(private val context: Context) {
             val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
             val widthColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.WIDTH)
             val heightColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.HEIGHT)
+
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val title = cursor.getString(nameColumn) ?: "Unknown"
                 val duration = cursor.getLong(durationColumn)
-                val data = cursor.getString(dataColumn)
+                val data = cursor.getString(dataColumn) ?: ""
                 val size = cursor.getLong(sizeColumn)
                 val width = cursor.getInt(widthColumn)
                 val height = cursor.getInt(heightColumn)
+
                 val contentUri: Uri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
-                val folderName = java.io.File(data).parentFile?.name ?: "Unknown"
+                val folderName = File(data).parentFile?.name ?: "Unknown"
                 val thumbnailUri = thumbnailsMap[id] ?: contentUri
+
                 videos.add(
                     VideoItem(
                         uri = contentUri,
@@ -145,20 +176,23 @@ class MediaStoreHelper(private val context: Context) {
         videos
     }
 
-    suspend fun getFolders(): List<FolderItem> = withContext(Dispatchers.IO) {
-        val allVideos = getAllVideos()
+    suspend fun getFolders(blacklistedFolders: List<String> = emptyList()): List<FolderItem> = withContext(Dispatchers.IO) {
+        val allVideos = getAllVideos(blacklistedFolders)
         val foldersMap = mutableMapOf<String, MutableList<VideoItem>>()
         
         allVideos.forEach { video ->
-            if (!foldersMap.containsKey(video.folderName)) {
-                foldersMap[video.folderName] = mutableListOf()
+            val parentPath = File(video.path).parentFile?.absolutePath ?: video.folderName
+            if (!foldersMap.containsKey(parentPath)) {
+                foldersMap[parentPath] = mutableListOf()
             }
-            foldersMap[video.folderName]?.add(video)
+            foldersMap[parentPath]?.add(video)
         }
 
-        foldersMap.map { (folderName, videos) ->
+        foldersMap.map { (parentPath, videos) ->
+            val folderName = File(parentPath).name.ifEmpty { parentPath }
             FolderItem(
                 name = folderName,
+                path = parentPath,
                 videoCount = videos.size,
                 thumbnailUri = videos.firstOrNull()?.thumbnailUri
             )

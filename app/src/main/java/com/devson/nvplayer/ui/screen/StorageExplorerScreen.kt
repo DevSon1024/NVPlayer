@@ -38,6 +38,8 @@ import com.devson.nvplayer.ui.components.CustomRenameDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.devson.nvplayer.viewmodel.FileOperationsViewModel
 import java.io.File
 
 private data class FileNode(
@@ -53,6 +55,7 @@ fun StorageExplorerScreen(
     isBlacklistMode: Boolean = false,
     onFoldersBlacklisted: (List<String>) -> Unit = {},
     onComplete: () -> Unit = {},
+    fileOpsViewModel: FileOperationsViewModel = viewModel(),
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
@@ -62,7 +65,7 @@ fun StorageExplorerScreen(
     var currentDir by remember { mutableStateOf(root) }
     var entries by remember { mutableStateOf<List<FileNode>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var isProcessing by remember { mutableStateOf(false) }
+    val isProcessing by fileOpsViewModel.operationInProgress.collectAsState()
     var showNewFolderDialog by remember { mutableStateOf(false) }
     val selectedFolders = remember { mutableStateListOf<String>() }
 
@@ -102,9 +105,13 @@ fun StorageExplorerScreen(
     val targetRelativePath = remember(currentDir) {
         val rootPath = root.absolutePath
         val absPath = currentDir.absolutePath
-        if (absPath.startsWith(rootPath)) {
-            absPath.removePrefix("$rootPath/").ifEmpty { "Movies" }
-        } else "Movies"
+        if (absPath == rootPath) {
+            "Movies"
+        } else if (absPath.startsWith(rootPath)) {
+            absPath.substring(rootPath.length).removePrefix("/")
+        } else {
+            "Movies"
+        }
     }
 
     // Create folder uses CustomRenameDialog
@@ -291,32 +298,12 @@ fun StorageExplorerScreen(
 
                         Button(
                             onClick = {
-                                isProcessing = true
-                                coroutineScope.launch {
-                                    val success = executeFileOperation(
-                                        context = context,
-                                        type = operationType,
-                                        uris = sourceUris,
-                                        targetRelativePath = targetRelativePath
-                                    )
-                                    isProcessing = false
-                                    val verb = if (operationType == "MOVE") "Moved" else "Copied"
-                                    if (success) {
-                                        Toast.makeText(
-                                            context,
-                                            "$verb to ${if (currentDir == root) "Internal Storage" else currentDir.name}",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                        onComplete()
-                                    } else {
-                                        Toast.makeText(
-                                            context,
-                                            "$verb to ${if (currentDir == root) "Internal Storage" else currentDir.name} (may need refresh)",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                        onComplete()
-                                    }
+                                if (operationType == "MOVE") {
+                                    fileOpsViewModel.moveVideosByUri(context, sourceUris, targetRelativePath)
+                                } else {
+                                    fileOpsViewModel.copyVideosByUri(context, sourceUris, targetRelativePath)
                                 }
+                                onComplete()
                             },
                             modifier = Modifier.weight(2f),
                             shape = RoundedCornerShape(12.dp),
@@ -595,69 +582,3 @@ private fun ExplorerFolderRow(
     }
 }
 
-private suspend fun executeFileOperation(
-    context: Context,
-    type: String,
-    uris: List<Uri>,
-    targetRelativePath: String
-): Boolean = withContext(Dispatchers.IO) {
-    var anySuccess = false
-    try {
-        val resolver = context.contentResolver
-        val relativePath = if (targetRelativePath.endsWith("/")) targetRelativePath
-        else "$targetRelativePath/"
-
-        uris.forEach { uri ->
-            runCatching {
-                var displayName = "video_${System.currentTimeMillis()}.mp4"
-                resolver.query(
-                    uri,
-                    arrayOf(MediaStore.Video.Media.DISPLAY_NAME),
-                    null, null, null
-                )?.use { cursor ->
-                    if (cursor.moveToFirst()) displayName = cursor.getString(0) ?: displayName
-                }
-
-                val mimeType = resolver.getType(uri) ?: "video/mp4"
-                val values = ContentValues().apply {
-                    put(MediaStore.Video.Media.DISPLAY_NAME, displayName)
-                    put(MediaStore.Video.Media.MIME_TYPE, mimeType)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        put(MediaStore.Video.Media.RELATIVE_PATH, relativePath)
-                        put(MediaStore.Video.Media.IS_PENDING, 1)
-                    }
-                }
-
-                val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
-                val destinationUri = resolver.insert(collection, values)
-                    ?: throw IllegalStateException("MediaStore insert returned null")
-
-                resolver.openInputStream(uri)?.use { input ->
-                    resolver.openOutputStream(destinationUri)?.use { output ->
-                        val buffer = ByteArray(8192)
-                        var bytesRead: Int
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                            output.write(buffer, 0, bytesRead)
-                        }
-                    }
-                }
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val updateValues = ContentValues().apply {
-                        put(MediaStore.Video.Media.IS_PENDING, 0)
-                    }
-                    resolver.update(destinationUri, updateValues, null, null)
-                }
-
-                if (type == "MOVE") {
-                    runCatching { resolver.delete(uri, null, null) }
-                }
-                anySuccess = true
-            }.onFailure { it.printStackTrace() }
-        }
-        anySuccess
-    } catch (e: Exception) {
-        e.printStackTrace()
-        anySuccess
-    }
-}

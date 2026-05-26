@@ -45,7 +45,8 @@ class VideoListViewModel(
     private val _searchSuggestions = MutableStateFlow<List<String>>(emptyList())
     val searchSuggestions: StateFlow<List<String>> = _searchSuggestions.asStateFlow()
 
-    private var currentSearchQuery = ""
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     /**
      * Public, filtered view of videos by folder.
@@ -53,10 +54,12 @@ class VideoListViewModel(
      * no disk I/O is triggered by toggling showHiddenFiles / recognizeNoMedia.
      */
     val videosByFolder: StateFlow<Map<VideoFolder, List<Video>>> =
-        combine(_rawVideosByFolder, viewSettingsRepo.viewSettingsFlow) { raw, _ ->
+        combine(_rawVideosByFolder, _searchQuery, viewSettingsRepo.viewSettingsFlow) { raw, query, _ ->
             raw.mapValues { (_, videos) ->
                 videos.filter { video ->
-                    !video.path.split("/").any { seg -> seg.startsWith(".") && seg.length > 1 }
+                    val matchesPath = !video.path.split("/").any { seg -> seg.startsWith(".") && seg.length > 1 }
+                    val matchesSearch = query.isBlank() || video.title.contains(query, ignoreCase = true)
+                    matchesPath && matchesSearch
                 }
             }.filterValues { it.isNotEmpty() }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
@@ -66,52 +69,57 @@ class VideoListViewModel(
             if (forceRefresh) _isRefreshing.value = true else _isLoading.value = true
             _loadingProgress.value = 0f
             try {
-                val folderItems = repository.getFolders()
+                val videoItems = repository.getAllVideos()
                 val mappedVideos = mutableMapOf<VideoFolder, List<Video>>()
-                val totalFolders = folderItems.size
-
-                if (totalFolders > 0) {
-                    folderItems.forEachIndexed { index, folderItem ->
-                        _loadingProgress.value = index.toFloat() / totalFolders.toFloat()
-                        val videoItems = repository.getVideosByFolder(folderItem.name)
-                        val videos = videoItems.map { item ->
-                            val dateVal = try {
-                                File(item.path).lastModified() / 1000L
-                            } catch (e: Exception) {
-                                0L
-                            }
-                            Video(
-                                uri = item.uri.toString(),
-                                title = item.title,
-                                duration = item.duration,
-                                folderName = item.folderName,
-                                path = item.path,
-                                size = item.size,
-                                width = item.width,
-                                height = item.height,
-                                dateAdded = dateVal,
-                                playedTime = null,
-                                lastPlayedAt = null,
-                                resolution = "${item.width}x${item.height}",
-                                frameRate = 30.0f,
-                                thumbnailUri = item.thumbnailUri?.toString()
-                            )
+                
+                // Group by parent folder absolute path
+                val groupedByPath = videoItems.groupBy { item ->
+                    File(item.path).parentFile?.absolutePath ?: item.folderName
+                }
+                
+                val totalPaths = groupedByPath.size
+                var index = 0
+                groupedByPath.forEach { (parentPath, items) ->
+                    _loadingProgress.value = if (totalPaths > 0) index.toFloat() / totalPaths.toFloat() else 1f
+                    
+                    val folderName = File(parentPath).name.ifEmpty { parentPath }
+                    val videos = items.map { item ->
+                        val dateVal = try {
+                            File(item.path).lastModified() / 1000L
+                        } catch (e: Exception) {
+                            0L
                         }
-                        if (videos.isNotEmpty()) {
-                            val videoFolder = VideoFolder(
-                                id = File(videos.first().path).parentFile?.absolutePath ?: folderItem.name,
-                                name = folderItem.name
-                            )
-                            mappedVideos[videoFolder] = videos
-                        }
+                        Video(
+                            uri = item.uri.toString(),
+                            title = item.title,
+                            duration = item.duration,
+                            folderName = item.folderName,
+                            path = item.path,
+                            size = item.size,
+                            width = item.width,
+                            height = item.height,
+                            dateAdded = dateVal,
+                            playedTime = null,
+                            lastPlayedAt = null,
+                            resolution = "${item.width}x${item.height}",
+                            frameRate = 30.0f,
+                            thumbnailUri = item.thumbnailUri?.toString()
+                        )
                     }
+                    if (videos.isNotEmpty()) {
+                        val videoFolder = VideoFolder(
+                            id = parentPath,
+                            name = folderName
+                        )
+                        mappedVideos[videoFolder] = videos
+                    }
+                    index++
                 }
 
                 _loadingProgress.value = 1f
                 // Store raw (unfiltered) - the combine flow handles filtering reactively
                 _rawVideosByFolder.value = mappedVideos
                 updateExplorerNodes()
-                performSearch()
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -126,37 +134,27 @@ class VideoListViewModel(
     }
 
     fun clearSearch() {
-        currentSearchQuery = ""
+        _searchQuery.value = ""
         _searchSuggestions.value = emptyList()
-        loadVideos()
     }
 
     fun onSearchQueryChanged(query: String) {
-        currentSearchQuery = query
+        _searchQuery.value = query
         if (query.isBlank()) {
             _searchSuggestions.value = emptyList()
         } else {
-            val allVideos = videosByFolder.value.values.flatten()
+            val allVideos = _rawVideosByFolder.value.values.flatten()
             val matches = allVideos.filter { it.title.contains(query, ignoreCase = true) }
                 .map { it.title }
                 .distinct()
                 .take(5)
             _searchSuggestions.value = matches
         }
-        performSearch()
     }
 
     fun getSearchResults(query: String): List<Video> {
         if (query.isBlank()) return emptyList()
-        return videosByFolder.value.values.flatten().filter { it.title.contains(query, ignoreCase = true) }
-    }
-
-    private fun performSearch() {
-        if (currentSearchQuery.isBlank()) return
-        val filtered = _rawVideosByFolder.value.mapValues { (_, videos) ->
-            videos.filter { it.title.contains(currentSearchQuery, ignoreCase = true) }
-        }.filterValues { it.isNotEmpty() }
-        _rawVideosByFolder.value = filtered
+        return _rawVideosByFolder.value.values.flatten().filter { it.title.contains(query, ignoreCase = true) }
     }
 
     // Explorer Path Navigation 

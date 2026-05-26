@@ -14,64 +14,39 @@ class VideoRepository(
     private val settingsRepo = com.devson.nvplayer.repository.PlaybackSettingsRepository(context)
 
     suspend fun getAllVideos(): List<VideoItem> = withContext(Dispatchers.IO) {
-        val blacklisted = settingsRepo.playbackSettingsFlow.value.blacklistedFolders
-        mediaStoreHelper.getAllVideos().filterNot { item ->
-            blacklisted.any { blacklistedPath -> item.path.startsWith(blacklistedPath) }
-        }
+        val blacklisted = settingsRepo.playbackSettingsFlow.value.blacklistedFolders.toList()
+        mediaStoreHelper.getAllVideos(blacklisted)
     }
 
     suspend fun getFolders(): List<FolderItem> = withContext(Dispatchers.IO) {
-        val blacklisted = settingsRepo.playbackSettingsFlow.value.blacklistedFolders
-        val filteredVideos = mediaStoreHelper.getAllVideos().filterNot { item ->
-            blacklisted.any { blacklistedPath -> item.path.startsWith(blacklistedPath) }
-        }
-        val foldersMap = mutableMapOf<String, MutableList<VideoItem>>()
-        filteredVideos.forEach { video ->
-            if (!foldersMap.containsKey(video.folderName)) {
-                foldersMap[video.folderName] = mutableListOf()
-            }
-            foldersMap[video.folderName]?.add(video)
-        }
-        foldersMap.map { (folderName, videos) ->
-            FolderItem(
-                name = folderName,
-                videoCount = videos.size,
-                thumbnailUri = videos.firstOrNull()?.thumbnailUri
-            )
-        }.sortedBy { it.name }
+        val blacklisted = settingsRepo.playbackSettingsFlow.value.blacklistedFolders.toList()
+        mediaStoreHelper.getFolders(blacklisted)
     }
 
     suspend fun getVideosByFolder(folderName: String): List<VideoItem> = withContext(Dispatchers.IO) {
-        val blacklisted = settingsRepo.playbackSettingsFlow.value.blacklistedFolders
-        mediaStoreHelper.getAllVideos()
+        val blacklisted = settingsRepo.playbackSettingsFlow.value.blacklistedFolders.toList()
+        mediaStoreHelper.getAllVideos(blacklisted)
             .filter { it.folderName == folderName }
-            .filterNot { item ->
-                blacklisted.any { blacklistedPath -> item.path.startsWith(blacklistedPath) }
-            }
     }
 
     /**
      * Retrieves videos that are in the system trash and maps them to the app's Video model.
      */
     suspend fun getTrashedVideos(): List<com.devson.nvplayer.model.Video> = withContext(Dispatchers.IO) {
-        val trashedItems = mediaStoreHelper.getTrashedVideos()
-        val blacklisted = settingsRepo.playbackSettingsFlow.value.blacklistedFolders
-        trashedItems
-            .filterNot { item ->
-                blacklisted.any { blacklistedPath -> item.path.startsWith(blacklistedPath) }
-            }
-            .map { item ->
-                com.devson.nvplayer.model.Video(
-                    uri = item.uri.toString(),
-                    title = item.title,
-                    duration = item.duration,
-                    folderName = item.folderName,
-                    path = item.path,
-                    size = item.size,
-                    width = item.width,
-                    height = item.height,
-                    thumbnailUri = item.thumbnailUri?.toString()
-                )
-            }
+        val blacklisted = settingsRepo.playbackSettingsFlow.value.blacklistedFolders.toList()
+        val trashedItems = mediaStoreHelper.getTrashedVideos(blacklisted)
+        trashedItems.map { item ->
+            com.devson.nvplayer.model.Video(
+                uri = item.uri.toString(),
+                title = item.title,
+                duration = item.duration,
+                folderName = item.folderName,
+                path = item.path,
+                size = item.size,
+                width = item.width,
+                height = item.height,
+                thumbnailUri = item.thumbnailUri?.toString()
+            )
+        }
     }
 }

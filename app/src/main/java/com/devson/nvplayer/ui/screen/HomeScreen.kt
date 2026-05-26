@@ -379,7 +379,7 @@ fun HomeScreen(
                         FolderCard(
                             folder = folder,
                             videoCount = videoCount,
-                            onClick = { onFolderClick(folder.name) }
+                            onClick = { onFolderClick(folder.id) }
                         )
                     }
                 }

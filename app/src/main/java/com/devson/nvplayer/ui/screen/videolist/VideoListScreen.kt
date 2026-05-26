@@ -214,6 +214,8 @@ fun VideoListScreen(
         }
     }
 
+    val showOverwriteDialog by fileOpsViewModel.showOverwriteDialog.collectAsState()
+
     //  File operation result → Toast + list reload 
     val opResult by fileOpsViewModel.operationResult.collectAsState()
     LaunchedEffect(opResult) {
@@ -229,6 +231,14 @@ fun VideoListScreen(
         if (needsRefresh) {
             viewModel.loadVideos(forceRefresh = true)
             fileOpsViewModel.onRefreshHandled()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        fileOpsViewModel.pendingDeletionsFlow.collect { uris ->
+            if (uris.isNotEmpty()) {
+                fileOpsViewModel.deleteVideos(context, uris, trash = false)
+            }
         }
     }
 
@@ -843,6 +853,26 @@ fun VideoListScreen(
                         }
                     ) { Text("Delete Permanently", color = MaterialTheme.colorScheme.error) }
                 }
+            }
+        )
+    }
+
+    if (showOverwriteDialog) {
+        AlertDialog(
+            onDismissRequest = { fileOpsViewModel.cancelOverwrite() },
+            title = { Text("Replace File") },
+            text = { Text("A file with this name already exists in the destination. Do you want to replace it?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        fileOpsViewModel.confirmOverwrite(context)
+                        selectedFolders = emptySet()
+                        selectedVideos = emptySet()
+                    }
+                ) { Text("Replace") }
+            },
+            dismissButton = {
+                TextButton(onClick = { fileOpsViewModel.cancelOverwrite() }) { Text("Cancel") }
             }
         )
     }
