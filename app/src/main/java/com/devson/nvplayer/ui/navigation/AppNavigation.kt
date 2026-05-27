@@ -33,6 +33,9 @@ import com.devson.nvplayer.viewmodel.FileOperationsViewModel
 import com.devson.nvplayer.model.ViewMode
 import com.devson.nvplayer.player.DecoderMode
 import com.devson.nvplayer.player.MPVPlayerEngine
+import com.devson.nvplayer.ui.screens.settings.ToolScreen
+import com.devson.nvplayer.ui.screens.settings.MilliSecondScreen
+import com.devson.nvplayer.ui.screens.settings.MediaStoreFinderScreen
 
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
@@ -169,7 +172,29 @@ fun AppNavigation(
                 onNavigateToCustomHome = { navController.navigate("custom_home") },
                 onNavigateToPlayerInterface = { navController.navigate("player_interface") },
                 onNavigateToScanFolders = { navController.navigate("folder_settings") },
+                onNavigateToTool = { navController.navigate("tools") },
                 settingsViewModel = settingsViewModel
+            )
+        }
+
+        composable("tools") {
+            ToolScreen(
+                onBack = safePopBackStack,
+                onNavigateToMilliSeconds = { navController.navigate("tools_milliseconds") },
+                onNavigateToVideoEditor = {},
+                onNavigateToMediaStoreFinder = { navController.navigate("tools_mediastore_finder") }
+            )
+        }
+
+        composable("tools_milliseconds") {
+            MilliSecondScreen(
+                onBack = safePopBackStack
+            )
+        }
+
+        composable("tools_mediastore_finder") {
+            MediaStoreFinderScreen(
+                onBack = safePopBackStack
             )
         }
 
