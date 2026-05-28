@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
 import com.devson.nvplayer.repository.EnhanceMode
 import com.devson.nvplayer.repository.PlaybackSettings
 
@@ -54,6 +55,10 @@ class PlayerViewModel(
 
     private val _isHwSupported = MutableStateFlow(true)
     val isHwSupported: StateFlow<Boolean> = _isHwSupported.asStateFlow()
+
+    // Tracks whether the HW decoder was confirmed active at least once for the current video.
+    // Prevents false fallback detection from the initial "no" value or end-of-file teardown.
+    private var hwdecEverActiveForCurrentVideo = false
 
     private val _currentUri = MutableStateFlow<Uri?>(null)
     val currentUri: StateFlow<Uri?> = _currentUri.asStateFlow()
@@ -126,48 +131,74 @@ class PlayerViewModel(
             }
         }
 
-        // Detect decoder fallback during playback
+        // Coroutine 1: Detect RUNTIME fallback (HW was active, then dropped to SW mid-playback).
+        // Uses collectLatest so any in-flight delay is cancelled when hwdecCurrent changes.
+        // NOTE: This does NOT handle the "HW never became active" case — StateFlow won't
+        // re-emit "no" if hwdecCurrent was already "no" before playback started.
         viewModelScope.launch {
-            combine(
-                playerEngine.hwdecCurrent,
-                playbackSettings,
-                playbackState
-            ) { actual, settings, state ->
-                Triple(actual, settings.decoderMode, state)
-            }.collect { (actual, preferred, state) ->
-                if (state is PlayerState.Playing || state is PlayerState.Paused) {
-                    val preferredIsHw = preferred == DecoderMode.HW || preferred == DecoderMode.HW_PLUS || preferred == DecoderMode.AUTO
-                    if (preferredIsHw && actual == "no") {
-                        // Wait a short moment to allow decoder initialization to settle
-                        delay(1000L)
-                        
-                        val latestState = playerEngine.playbackState.value
-                        val isPlayerActive = latestState is PlayerState.Playing || latestState is PlayerState.Paused
-                        
-                        val currentActual = playerEngine.hwdecCurrent.value
-                        val currentPreferred = playbackSettings.value.decoderMode
-                        val currentPreferredIsHw = currentPreferred == DecoderMode.HW || currentPreferred == DecoderMode.HW_PLUS || currentPreferred == DecoderMode.AUTO
-                        if (currentPreferredIsHw && currentActual == "no" && isPlayerActive && isVideoLoaded) {
-                            Log.w("PlayerViewModel", "Decoder fallback detected! Current active decoder is SW but preferred was HW. Marking unsupported.")
-                            val wasHwSupported = _isHwSupported.value
-                            _isHwSupported.value = false
-                            
-                            playerEngine.setDecoder(DecoderMode.SW)
-                            
-                            if (wasHwSupported) {
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(
-                                        getApplication(),
-                                        "Hardware decoding is not supported for this video. Falling back to Software decoding.",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                            }
+            playerEngine.hwdecCurrent.collectLatest { actual ->
+                val preferred = playbackSettings.value.decoderMode
+                val preferredIsHw = preferred == DecoderMode.HW || preferred == DecoderMode.HW_PLUS || preferred == DecoderMode.AUTO
+
+                if (preferredIsHw && actual != "no") {
+                    // HW decoder confirmed active — mark it for this video session
+                    if (!hwdecEverActiveForCurrentVideo) {
+                        Log.d("PlayerViewModel", "HW decoder confirmed active: $actual")
+                        hwdecEverActiveForCurrentVideo = true
+                    }
+                    _isHwSupported.value = true
+
+                } else if (preferredIsHw && actual == "no" && hwdecEverActiveForCurrentVideo) {
+                    // HW was confirmed active before, but just dropped to "no" — potential runtime fallback.
+                    // Guard: only act if actively playing (not a teardown/close event).
+                    val state = playerEngine.playbackState.value
+                    if (!isVideoLoaded || state !is PlayerState.Playing) return@collectLatest
+
+                    delay(1500L) // Short wait to let decoder settle
+
+                    // Re-verify all conditions after delay
+                    if (!isVideoLoaded) return@collectLatest
+                    if (playerEngine.playbackState.value !is PlayerState.Playing) return@collectLatest
+                    if (playerEngine.hwdecCurrent.value != "no") return@collectLatest // recovered
+                    val prefNow = playbackSettings.value.decoderMode
+                    val prefNowIsHw = prefNow == DecoderMode.HW || prefNow == DecoderMode.HW_PLUS || prefNow == DecoderMode.AUTO
+                    if (!prefNowIsHw) return@collectLatest // user switched to SW manually
+
+                    Log.w("PlayerViewModel", "Runtime HW→SW fallback detected after 1.5s confirmation.")
+                    triggerSwFallback()
+                }
+                // If preferredIsHw && actual == "no" && !hwdecEverActiveForCurrentVideo:
+                // This is handled by Coroutine 2 below (StateFlow won't re-emit here on video start).
+            }
+        }
+
+        // Coroutine 2: Detect INITIAL failure (HW decoder never became active for this video).
+        // Triggered by playbackState → Playing transition, not by hwdecCurrent changes.
+        // This correctly handles videos where HW is unsupported because hwdecCurrent stays "no"
+        // and never re-emits, so collectLatest would never fire again after the initial Loading check.
+        viewModelScope.launch {
+            var prevState: PlayerState = PlayerState.Idle
+            playbackState.collect { state ->
+                if (state is PlayerState.Playing && prevState !is PlayerState.Playing) {
+                    // State just transitioned to Playing — spawn a one-shot check after stabilization
+                    viewModelScope.launch {
+                        delay(2500L) // Give HW decoder time to start up
+
+                        if (!isVideoLoaded) return@launch
+                        if (hwdecEverActiveForCurrentVideo) return@launch // HW already confirmed active, nothing to do
+                        if (playerEngine.playbackState.value !is PlayerState.Playing) return@launch
+
+                        val actual = playerEngine.hwdecCurrent.value
+                        val preferred = playbackSettings.value.decoderMode
+                        val preferredIsHw = preferred == DecoderMode.HW || preferred == DecoderMode.HW_PLUS || preferred == DecoderMode.AUTO
+
+                        if (preferredIsHw && actual == "no") {
+                            Log.w("PlayerViewModel", "HW decoder never became active after 2.5s of playback. Marking unsupported.")
+                            triggerSwFallback()
                         }
-                    } else if (preferredIsHw && actual != "no") {
-                        _isHwSupported.value = true
                     }
                 }
+                prevState = state
             }
         }
 
@@ -213,6 +244,26 @@ class PlayerViewModel(
             seekTo(savedPos)
         }
         isPositionRestored = true
+    }
+
+    /**
+     * Switches active decoder to SW and shows a user-facing toast.
+     * Called when HW decoding is confirmed unavailable for the current video.
+     * Must be called from a coroutine context.
+     */
+    private suspend fun triggerSwFallback() {
+        val wasHwSupported = _isHwSupported.value
+        _isHwSupported.value = false
+        playerEngine.setDecoder(DecoderMode.SW)
+        if (wasHwSupported) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(
+                    getApplication(),
+                    "Hardware decoding is not supported for this video. Falling back to Software decoding.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
     }
 
     fun saveBrightness(brightness: Float) {
@@ -276,6 +327,7 @@ class PlayerViewModel(
         isVideoLoaded = false
         isPositionRestored = false
         _isHwSupported.value = true
+        hwdecEverActiveForCurrentVideo = false
 
         // Save progress as 0 if not already present, and update timestamp
         val prefs = getApplication<Application>().getSharedPreferences("watch_history_prefs", Context.MODE_PRIVATE)
@@ -363,6 +415,7 @@ class PlayerViewModel(
         isVideoLoaded = false
         isPositionRestored = false
         _isHwSupported.value = true
+        hwdecEverActiveForCurrentVideo = false
 
         // Save progress as 0 if not already present, and update timestamp
         val prefs = getApplication<Application>().getSharedPreferences("watch_history_prefs", Context.MODE_PRIVATE)
