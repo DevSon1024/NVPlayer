@@ -50,7 +50,9 @@ fun AppNavigation(
     playerEngine: () -> MPVPlayerEngine,
     settingsViewModel: SettingsViewModel,
     videoListViewModel: VideoListViewModel,
-    fileOpsViewModel: FileOperationsViewModel
+    fileOpsViewModel: FileOperationsViewModel,
+    isInPipMode: Boolean = false,
+    onEnterPip: () -> Unit = {}
 ) {
     val navController = rememberNavController()
 
@@ -412,7 +414,11 @@ fun AppNavigation(
                 onSelectChapter = { playerVm.selectChapter(it) },
                 currentDecoder = if (!isHwSupported) DecoderMode.SW.displayName else playbackSettings.decoderMode.displayName,
                 isHwSupported = isHwSupported,
-                onUpdateDecoderMode = { playerVm.updateDecoderMode(it) }
+                onUpdateDecoderMode = { playerVm.updateDecoderMode(it) },
+                onCycleAspectMode = { playerVm.cycleAspectMode() },
+                isInPipMode = isInPipMode,
+                onEnterPip = onEnterPip,
+                onUpdateBackgroundPlayEnabled = { settingsViewModel.updateBackgroundPlayEnabled(it) }
             )
         }
     }

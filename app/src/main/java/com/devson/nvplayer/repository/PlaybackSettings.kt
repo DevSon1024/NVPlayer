@@ -88,7 +88,9 @@ data class PlaybackSettings(
     // Portrait TopLeft is always BACK_ARROW + VIDEO_TITLE (non-editable, enforced in PlayerScreen)
     val portraitTopLeftControls: String = "BACK_ARROW,VIDEO_TITLE",
     val portraitTopRightControls: String = "SUBTITLES,AUDIO_TRACK,MORE_OPTIONS",
-    val portraitBottomControls: String = "DECODER,CHAPTERS,SMART_ENHANCE,ASPECT_RATIO,SCREEN_ROTATION"
+    val portraitBottomControls: String = "DECODER,CHAPTERS,SMART_ENHANCE,ASPECT_RATIO,SCREEN_ROTATION",
+    val aspectMode: com.devson.nvplayer.player.AspectMode = com.devson.nvplayer.player.AspectMode.FIT,
+    val backgroundPlayEnabled: Boolean = false
 )
 
 

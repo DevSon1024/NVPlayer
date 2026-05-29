@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import com.devson.nvplayer.ui.component.AspectIcons
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -231,7 +232,8 @@ fun ControlLayoutEditorScreen(
                 bottomRight = bottomRightList,
                 portraitTopLeft = portraitTopLeftList,
                 portraitTopRight = portraitTopRightList,
-                portraitBottom = portraitBottomList
+                portraitBottom = portraitBottomList,
+                aspectMode = playbackSettings.aspectMode
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -338,7 +340,8 @@ fun ControlLayoutEditorScreen(
                                             PlayerButtonIcon(
                                                 button = button,
                                                 tint = MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.size(22.dp)
+                                                modifier = Modifier.size(22.dp),
+                                                aspectMode = playbackSettings.aspectMode
                                             )
                                         }
                                     }
@@ -434,7 +437,8 @@ fun ControlLayoutEditorScreen(
                                     PlayerButtonIcon(
                                         button = button,
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(22.dp)
+                                        modifier = Modifier.size(22.dp),
+                                        aspectMode = playbackSettings.aspectMode
                                     )
                                     // Small plus indicator in bottom-right corner
                                     Box(
@@ -505,7 +509,8 @@ fun ControlLayoutEditorScreen(
                                 PlayerButtonIcon(
                                     button = button,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(20.dp),
+                                    aspectMode = playbackSettings.aspectMode
                                 )
                             }
                             Spacer(modifier = Modifier.width(16.dp))
@@ -529,6 +534,7 @@ fun ControlLayoutEditorScreen(
                                         PlayerButton.PICTURE_IN_PICTURE -> "Enter background Picture-in-Picture playback mode"
                                         PlayerButton.ASPECT_RATIO -> "Switch video aspect ratios (fit, stretch, zoom)"
                                         PlayerButton.MORE_OPTIONS -> "Open speed controls and advanced settings"
+                                        PlayerButton.BACKGROUND_PLAY -> "Toggle background audio playback mode"
                                         else -> ""
                                     },
                                     style = MaterialTheme.typography.bodySmall,
@@ -554,7 +560,8 @@ fun SimulatedPlayerPreview(
     bottomRight: List<PlayerButton>,
     portraitTopLeft: List<PlayerButton>,
     portraitTopRight: List<PlayerButton>,
-    portraitBottom: List<PlayerButton>
+    portraitBottom: List<PlayerButton>,
+    aspectMode: com.devson.nvplayer.player.AspectMode = com.devson.nvplayer.player.AspectMode.FIT
 ) {
     val widthFraction = if (isPortrait) 0.5f else 0.85f
     val aspectRatio = if (isPortrait) 9f / 16f else 16f / 9f
@@ -606,7 +613,8 @@ fun SimulatedPlayerPreview(
                         isSelected = selectedRegion == (if (isPortrait) ControlRegion.PORTRAIT_TOP_LEFT else ControlRegion.TOP_LEFT),
                         onClick = { onRegionSelect(if (isPortrait) ControlRegion.PORTRAIT_TOP_LEFT else ControlRegion.TOP_LEFT) },
                         buttons = if (isPortrait) portraitTopLeft else topLeft,
-                        modifier = Modifier.weight(1.3f)
+                        modifier = Modifier.weight(1.3f),
+                        aspectMode = aspectMode
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     // Top Right Region
@@ -615,7 +623,8 @@ fun SimulatedPlayerPreview(
                         isSelected = selectedRegion == (if (isPortrait) ControlRegion.PORTRAIT_TOP_RIGHT else ControlRegion.TOP_RIGHT),
                         onClick = { onRegionSelect(if (isPortrait) ControlRegion.PORTRAIT_TOP_RIGHT else ControlRegion.TOP_RIGHT) },
                         buttons = if (isPortrait) portraitTopRight else topRight,
-                        modifier = Modifier.weight(0.7f)
+                        modifier = Modifier.weight(0.7f),
+                        aspectMode = aspectMode
                     )
                 }
 
@@ -634,7 +643,8 @@ fun SimulatedPlayerPreview(
                             isSelected = selectedRegion == ControlRegion.BOTTOM_LEFT,
                             onClick = { onRegionSelect(ControlRegion.BOTTOM_LEFT) },
                             buttons = bottomLeft,
-                            modifier = Modifier.weight(0.8f)
+                            modifier = Modifier.weight(0.8f),
+                            aspectMode = aspectMode
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         // Bottom Right Region
@@ -643,7 +653,8 @@ fun SimulatedPlayerPreview(
                             isSelected = selectedRegion == ControlRegion.BOTTOM_RIGHT,
                             onClick = { onRegionSelect(ControlRegion.BOTTOM_RIGHT) },
                             buttons = bottomRight,
-                            modifier = Modifier.weight(1.2f)
+                            modifier = Modifier.weight(1.2f),
+                            aspectMode = aspectMode
                         )
                     }
                 }
@@ -660,7 +671,8 @@ fun SimulatedPlayerPreview(
                             isSelected = selectedRegion == ControlRegion.PORTRAIT_BOTTOM,
                             onClick = { onRegionSelect(ControlRegion.PORTRAIT_BOTTOM) },
                             buttons = portraitBottom,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            aspectMode = aspectMode
                         )
                     }
                 }
@@ -675,7 +687,8 @@ fun MockRegionBox(
     isSelected: Boolean,
     onClick: () -> Unit,
     buttons: List<PlayerButton>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    aspectMode: com.devson.nvplayer.player.AspectMode = com.devson.nvplayer.player.AspectMode.FIT
 ) {
     val highlightColor = MaterialTheme.colorScheme.primary
     val normalBorderColor = Color.White.copy(alpha = 0.15f)
@@ -743,7 +756,8 @@ fun MockRegionBox(
                             PlayerButtonIcon(
                                 button = button,
                                 tint = if (isSelected) highlightColor else Color.White.copy(alpha = 0.7f),
-                                modifier = Modifier.size(10.dp)
+                                modifier = Modifier.size(10.dp),
+                                aspectMode = aspectMode
                             )
                         }
                     }
@@ -922,7 +936,8 @@ fun RegionTabRow(
 fun PlayerButtonIcon(
     button: PlayerButton,
     tint: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    aspectMode: com.devson.nvplayer.player.AspectMode = com.devson.nvplayer.player.AspectMode.FIT
 ) {
     if (button == PlayerButton.DECODER) {
         Box(
@@ -940,6 +955,19 @@ fun PlayerButtonIcon(
                 textAlign = TextAlign.Center
             )
         }
+    } else if (button == PlayerButton.ASPECT_RATIO) {
+        val icon = when (aspectMode) {
+            com.devson.nvplayer.player.AspectMode.FIT -> AspectIcons.Fit
+            com.devson.nvplayer.player.AspectMode.STRETCH -> AspectIcons.Stretch
+            com.devson.nvplayer.player.AspectMode.CROP -> AspectIcons.Crop
+            com.devson.nvplayer.player.AspectMode.ORIGINAL -> AspectIcons.Original
+        }
+        Icon(
+            imageVector = icon,
+            contentDescription = button.displayName,
+            tint = tint,
+            modifier = modifier
+        )
     } else {
         Icon(
             imageVector = button.icon,

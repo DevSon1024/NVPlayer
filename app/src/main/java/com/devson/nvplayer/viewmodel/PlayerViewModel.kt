@@ -117,15 +117,23 @@ class PlayerViewModel(
             }
         }
 
-        // Observe decoder mode changes from settings and apply immediately if video is active
+        // Observe decoder and aspect mode changes from settings and apply immediately if video is active
         viewModelScope.launch {
             var lastDecoderMode: DecoderMode? = null
+            var lastAspectMode: com.devson.nvplayer.player.AspectMode? = null
             playbackSettings.collect { settings ->
                 if (lastDecoderMode != settings.decoderMode) {
                     lastDecoderMode = settings.decoderMode
                     if (isVideoLoaded) {
                         Log.d("PlayerViewModel", "Applying decoder change immediately: ${settings.decoderMode}")
                         playerEngine.setDecoder(settings.decoderMode)
+                    }
+                }
+                if (lastAspectMode != settings.aspectMode) {
+                    lastAspectMode = settings.aspectMode
+                    if (isVideoLoaded) {
+                        Log.d("PlayerViewModel", "Applying aspect mode change immediately: ${settings.aspectMode}")
+                        playerEngine.setAspectMode(settings.aspectMode)
                     }
                 }
             }
@@ -295,6 +303,14 @@ class PlayerViewModel(
         }
     }
 
+    fun cycleAspectMode() {
+        val current = playbackSettings.value.aspectMode
+        val nextMode = current.next()
+        viewModelScope.launch {
+            settingsRepo.updateAspectMode(nextMode)
+        }
+    }
+
     private var isVideoLoaded = false
     private var isPositionRestored = false
 
@@ -370,6 +386,9 @@ class PlayerViewModel(
 
             // Apply saved decoder setting
             playerEngine.setDecoder(playbackSettings.value.decoderMode)
+
+            // Apply saved aspect mode
+            playerEngine.setAspectMode(playbackSettings.value.aspectMode)
 
             // Apply smart enhance settings
             applyEnhanceSettings(playbackSettings.value)

@@ -52,7 +52,8 @@ class PlaybackSettingsRepository(context: Context) {
             "custom_playback_speed", "tap_and_hold_speed", "double_tap_seek_duration", "screenshot_location", "blacklisted_folders", "keep_awake_always", "decoder_mode",
             "enhance_mode", "enhance_saturation", "enhance_contrast", "enhance_brightness", "enhance_gamma", "enhance_hue",
             "top_left_controls", "top_right_controls", "bottom_left_controls", "bottom_right_controls",
-            "portrait_top_left_controls", "portrait_top_right_controls", "portrait_bottom_controls" -> {
+            "portrait_top_left_controls", "portrait_top_right_controls", "portrait_bottom_controls",
+            "aspect_mode", "background_play_enabled" -> {
                 _playbackSettingsFlow.value = loadPlaybackSettings()
             }
         }
@@ -201,7 +202,13 @@ class PlaybackSettingsRepository(context: Context) {
                 bottomVal.split(',')
                     .filter { it.isNotBlank() && it !in filterSet }
                     .joinToString(",")
-            }
+            },
+            aspectMode = try {
+                com.devson.nvplayer.player.AspectMode.valueOf(prefs.getString("aspect_mode", com.devson.nvplayer.player.AspectMode.FIT.name) ?: com.devson.nvplayer.player.AspectMode.FIT.name)
+            } catch (e: Exception) {
+                com.devson.nvplayer.player.AspectMode.FIT
+            },
+            backgroundPlayEnabled = prefs.getBoolean("background_play_enabled", false)
         )
     }
 
@@ -275,6 +282,8 @@ class PlaybackSettingsRepository(context: Context) {
             putString("portrait_top_left_controls", updated.portraitTopLeftControls)
             putString("portrait_top_right_controls", updated.portraitTopRightControls)
             putString("portrait_bottom_controls", updated.portraitBottomControls)
+            putString("aspect_mode", updated.aspectMode.name)
+            putBoolean("background_play_enabled", updated.backgroundPlayEnabled)
             apply()
         }
     }
@@ -558,5 +567,13 @@ class PlaybackSettingsRepository(context: Context) {
 
     suspend fun updatePortraitTopRightControls(controls: String) {
         updatePlaybackSettings { it.copy(portraitTopRightControls = controls) }
+    }
+
+    suspend fun updateAspectMode(mode: com.devson.nvplayer.player.AspectMode) {
+        updatePlaybackSettings { it.copy(aspectMode = mode) }
+    }
+
+    suspend fun updateBackgroundPlayEnabled(enabled: Boolean) {
+        updatePlaybackSettings { it.copy(backgroundPlayEnabled = enabled) }
     }
 }

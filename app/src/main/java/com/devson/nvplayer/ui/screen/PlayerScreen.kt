@@ -45,6 +45,7 @@ import com.devson.nvplayer.player.MPVSurfaceView
 import com.devson.nvplayer.player.PlayerState
 import com.devson.nvplayer.ui.component.PlayerControls
 import com.devson.nvplayer.ui.component.GestureOverlay
+import com.devson.nvplayer.ui.component.AspectIcons
 import com.devson.nvplayer.model.PlayerButton
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
@@ -72,6 +73,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import android.os.BatteryManager
 import android.content.res.Configuration
+import android.os.Build
+import android.content.Intent
+import com.devson.nvplayer.player.MediaPlaybackService
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -159,7 +163,11 @@ fun PlayerScreen(
     currentDecoder: String = "AUTO",
     onUpdateDecoderMode: (DecoderMode) -> Unit = {},
     isHwSupported: Boolean = true,
-    onTakeVideoScreenshot: () -> Unit = {}
+    onTakeVideoScreenshot: () -> Unit = {},
+    onCycleAspectMode: () -> Unit = {},
+    isInPipMode: Boolean = false,
+    onEnterPip: () -> Unit = {},
+    onUpdateBackgroundPlayEnabled: (Boolean) -> Unit = {}
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
     var isLocked by remember { mutableStateOf(false) }
@@ -201,6 +209,30 @@ fun PlayerScreen(
     }
     val context = LocalContext.current
     val windowInfo = LocalWindowInfo.current
+
+    // HUD overlay state for Aspect Ratio changes
+    var aspectOverlayText by remember { mutableStateOf<String?>(null) }
+    var isFirstAspectEmission by remember { mutableStateOf(true) }
+
+    LaunchedEffect(playbackSettings.aspectMode) {
+        if (isFirstAspectEmission) {
+            isFirstAspectEmission = false
+        } else {
+            aspectOverlayText = when (playbackSettings.aspectMode) {
+                com.devson.nvplayer.player.AspectMode.FIT -> "Fit Screen"
+                com.devson.nvplayer.player.AspectMode.STRETCH -> "Stretch"
+                com.devson.nvplayer.player.AspectMode.CROP -> "Crop"
+                com.devson.nvplayer.player.AspectMode.ORIGINAL -> "100% Original"
+            }
+        }
+    }
+
+    LaunchedEffect(aspectOverlayText) {
+        if (aspectOverlayText != null) {
+            delay(500L)
+            aspectOverlayText = null
+        }
+    }
 
     //  Pinch-to-Zoom state 
     // videoScale and videoOffset are owned here so they can be applied to the
@@ -292,6 +324,10 @@ fun PlayerScreen(
             val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, savedVolume.coerceIn(0, maxVol), 0)
         }
+        try {
+            val serviceIntent = Intent(context, MediaPlaybackService::class.java)
+            context.stopService(serviceIntent)
+        } catch (_: Exception) {}
     }
 
     // Dynamically adjust screen orientation based on user setting or video dimensions
@@ -399,7 +435,19 @@ fun PlayerScreen(
                 currentContext = currentContext.baseContext
             }
             if (currentIsPlaying) {
-                currentOnPlayPauseToggle()
+                val bgPlayEnabled = playbackSettings.backgroundPlayEnabled
+                if (bgPlayEnabled) {
+                    val intent = Intent(context, MediaPlaybackService::class.java).apply {
+                        putExtra(MediaPlaybackService.EXTRA_VIDEO_TITLE, videoTitle)
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(intent)
+                    } else {
+                        context.startService(intent)
+                    }
+                } else {
+                    currentOnPlayPauseToggle()
+                }
             }
         }
     }
@@ -507,32 +555,34 @@ fun PlayerScreen(
             }
 
             else -> {
-                if (!isLocked) {
-                    GestureOverlay(
-                        isPlaying = isPlaying,
-                        currentPosition = currentPosition,
-                        duration = duration,
-                        playbackSpeed = playbackSpeed,
-                        savedBrightness = savedBrightness,
-                        savedVolume = savedVolume,
-                        onPlayPauseToggle = onPlayPauseToggle,
-                        onSeek = onSeek,
-                        onSetPlaybackSpeed = onSetPlaybackSpeed,
-                        onSaveBrightness = onSaveBrightness,
-                        onSaveVolume = onSaveVolume,
-                        controlsVisible = controlsVisible,
-                        onControlsVisibleChanged = { controlsVisible = it },
-                        customPlaybackSpeed = playbackSettings.customPlaybackSpeed,
-                        tapAndHoldSpeed = playbackSettings.tapAndHoldSpeed,
-                        doubleTapSeekDurationMs = playbackSettings.doubleTapSeekDuration,
-                        playbackSettings = playbackSettings,
-                        onShowMuteIcon = {},
-                        onTakeVideoScreenshot = onTakeVideoScreenshot,
-                        onZoomChange = onZoomChange,
-                        audioBoosterEnabled = audioBoosterEnabled,
-                        audioBoostVolume = audioBoostVolume,
-                        onSetAudioBoostVolume = onSetAudioBoostVolume
-                    )
+                if (!isInPipMode) {
+                    if (!isLocked) {
+                        GestureOverlay(
+                            isPlaying = isPlaying,
+                            currentPosition = currentPosition,
+                            duration = duration,
+                            playbackSpeed = playbackSpeed,
+                            savedBrightness = savedBrightness,
+                            savedVolume = savedVolume,
+                            onPlayPauseToggle = onPlayPauseToggle,
+                            onSeek = onSeek,
+                            onSetPlaybackSpeed = onSetPlaybackSpeed,
+                            onSaveBrightness = onSaveBrightness,
+                            onSaveVolume = onSaveVolume,
+                            controlsVisible = controlsVisible,
+                            onControlsVisibleChanged = { controlsVisible = it },
+                            customPlaybackSpeed = playbackSettings.customPlaybackSpeed,
+                            tapAndHoldSpeed = playbackSettings.tapAndHoldSpeed,
+                            doubleTapSeekDurationMs = playbackSettings.doubleTapSeekDuration,
+                            playbackSettings = playbackSettings,
+                            onShowMuteIcon = {},
+                            onTakeVideoScreenshot = onTakeVideoScreenshot,
+                            onZoomChange = onZoomChange,
+                            audioBoosterEnabled = audioBoosterEnabled,
+                            audioBoostVolume = audioBoostVolume,
+                            onSetAudioBoostVolume = onSetAudioBoostVolume
+                        )
+                    }
                 }
 
                 ComposeSubtitleOverlay(
@@ -541,7 +591,7 @@ fun PlayerScreen(
                     bgStyle = playbackSettings.subtitleBgStyle,
                     subtitleFont = playbackSettings.subtitleFont,
                     isSubtitleBold = playbackSettings.isSubtitleBold,
-                    isSubtitleGestureEnabled = playbackSettings.subtitleGesturesEnabled,
+                    isSubtitleGestureEnabled = playbackSettings.subtitleGesturesEnabled && !isInPipMode,
                     verticalOffsetFraction = playbackSettings.subtitleVerticalOffset,
                     onVerticalOffsetFractionChanged = { offset ->
                         onUpdateSubtitleVerticalOffset(offset)
@@ -550,101 +600,100 @@ fun PlayerScreen(
                     onSeekPrev = onSeekPrevSubtitle
                 )
 
-                // Persistent top bar overlay when controls are hidden
-                AnimatedVisibility(
-                    visible = !controlsVisible && (playbackSettings.showRemainingTime || playbackSettings.showBatteryClockOverlay),
-                    enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-                    exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
-                    modifier = Modifier.align(Alignment.TopCenter)
-                ) {
-                    PersistentTopBar(
-                        duration = duration,
-                        currentPosition = currentPosition,
-                        showRemainingTime = playbackSettings.showRemainingTime,
-                        showBatteryClock = playbackSettings.showBatteryClockOverlay,
-                        modifier = Modifier
-                            .statusBarsPadding()
-                            .padding(top = 12.dp)
-                    )
-                }
+                if (!isInPipMode) {
+                    // Persistent top bar overlay when controls are hidden
+                    AnimatedVisibility(
+                        visible = !controlsVisible && (playbackSettings.showRemainingTime || playbackSettings.showBatteryClockOverlay),
+                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+                        modifier = Modifier.align(Alignment.TopCenter)
+                    ) {
+                        PersistentTopBar(
+                            duration = duration,
+                            currentPosition = currentPosition,
+                            showRemainingTime = playbackSettings.showRemainingTime,
+                            showBatteryClock = playbackSettings.showBatteryClockOverlay,
+                            modifier = Modifier
+                                .statusBarsPadding()
+                                .padding(top = 12.dp)
+                        )
+                    }
 
-                // Unified Premium Controls Layer
-                AnimatedVisibility(
-                    visible = controlsVisible && !isLocked,
-                    enter = fadeIn(),
-                    exit = fadeOut()
-                ) {
-                    PlayerControls(
-                        title = videoTitle,
-                        isPlaying = isPlaying,
-                        isSmartEnhanceEnabled = playbackSettings.enhanceMode != EnhanceMode.OFF,
-                        currentPosition = currentPosition,
-                        duration = duration,
-                        isDragging = isDragging,
-                        onDraggingChanged = { isDragging = it },
-                        onPlayPauseToggle = onPlayPauseToggle,
-                        onSeek = onSeek,
-                        onSpeedClick = {
-                            showPlayerSettingsSideSheet = true
-                        },
-                        onEnhanceClick = {
-                            showEnhanceSettingsSideSheet = true
-                        },
-                        onShowChapters = {
-                            showChaptersSideSheet = true
-                        },
-                        hasChapters = chapters.isNotEmpty(),
-                        currentDecoder = currentDecoder,
-                        onShowDecoder = {
-                            showDecoderSideSheet = true
-                        },
-                        onCycleSubtitle = {
-                            showSubtitleSettingsSideSheet = true
-                        },
-                        onCycleAudio = {
-                            showAudioSettingsSideSheet = true
-                        },
-                        onBackClick = handleBack,
-                        playbackSpeed = playbackSpeed,
-                        seekBarStyle = seekBarStyle,
-                        hasNext = hasNext,
-                        hasPrevious = hasPrevious,
-                        onNextClick = onNextClick,
-                        onPrevClick = onPrevClick,
-                        showSeekButtons = playbackSettings.showSeekButtons,
-                        showNextPrevButtons = playbackSettings.showNextPrevButtons,
-                        showElapsedTimeOverlay = playbackSettings.showElapsedTimeOverlay,
-                        showRemainingTime = playbackSettings.showRemainingTime,
-                        showBatteryClockOverlay = playbackSettings.showBatteryClockOverlay,
-                        showScreenRotationButton = playbackSettings.showScreenRotationButton,
-                        seekDurationSeconds = playbackSettings.seekDurationSeconds,
-                        controlIconSize = playbackSettings.controlIconSize,
-                        topLeftButtons = topLeftButtons,
-                        topRightButtons = topRightButtons,
-                        bottomLeftButtons = bottomLeftButtons,
-                        bottomRightButtons = bottomRightButtons,
-                        portraitTopLeftButtons = portraitTopLeftButtons,
-                        portraitTopRightButtons = portraitTopRightButtons,
-                        portraitBottomButtons = portraitBottomButtons,
-                        onLockClick = { isLocked = true },
-                        onAspectClick = {
-                            val nextMode = when (playbackSettings.fullScreenMode) {
-                                com.devson.nvplayer.repository.FullScreenMode.AUTO_SWITCH -> com.devson.nvplayer.repository.FullScreenMode.STRETCH
-                                com.devson.nvplayer.repository.FullScreenMode.STRETCH -> com.devson.nvplayer.repository.FullScreenMode.CROP
-                                com.devson.nvplayer.repository.FullScreenMode.CROP -> com.devson.nvplayer.repository.FullScreenMode.FIT
-                                com.devson.nvplayer.repository.FullScreenMode.FIT -> com.devson.nvplayer.repository.FullScreenMode.AUTO_SWITCH
-                            }
-                            onUpdateFullScreenMode(nextMode)
-                        },
-                        onPipClick = {
-                            try {
-                                activity?.enterPictureInPictureMode()
-                            } catch (e: Exception) {
-                                android.util.Log.e("PlayerScreen", "Failed to enter Picture-in-Picture mode", e)
-                            }
-                        },
-                        modifier = Modifier
-                    )
+                    // Unified Premium Controls Layer
+                    AnimatedVisibility(
+                        visible = controlsVisible && !isLocked,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        PlayerControls(
+                            title = videoTitle,
+                            isPlaying = isPlaying,
+                            isSmartEnhanceEnabled = playbackSettings.enhanceMode != EnhanceMode.OFF,
+                            currentPosition = currentPosition,
+                            duration = duration,
+                            isDragging = isDragging,
+                            onDraggingChanged = { isDragging = it },
+                            onPlayPauseToggle = onPlayPauseToggle,
+                            onSeek = onSeek,
+                            onSpeedClick = {
+                                showPlayerSettingsSideSheet = true
+                            },
+                            onEnhanceClick = {
+                                showEnhanceSettingsSideSheet = true
+                            },
+                            onShowChapters = {
+                                showChaptersSideSheet = true
+                            },
+                            hasChapters = chapters.isNotEmpty(),
+                            currentDecoder = currentDecoder,
+                            onShowDecoder = {
+                                showDecoderSideSheet = true
+                            },
+                            onCycleSubtitle = {
+                                showSubtitleSettingsSideSheet = true
+                            },
+                            onCycleAudio = {
+                                showAudioSettingsSideSheet = true
+                            },
+                            onBackClick = handleBack,
+                            playbackSpeed = playbackSpeed,
+                            seekBarStyle = seekBarStyle,
+                            hasNext = hasNext,
+                            hasPrevious = hasPrevious,
+                            onNextClick = onNextClick,
+                            onPrevClick = onPrevClick,
+                            showSeekButtons = playbackSettings.showSeekButtons,
+                            showNextPrevButtons = playbackSettings.showNextPrevButtons,
+                            showElapsedTimeOverlay = playbackSettings.showElapsedTimeOverlay,
+                            showRemainingTime = playbackSettings.showRemainingTime,
+                            showBatteryClockOverlay = playbackSettings.showBatteryClockOverlay,
+                            showScreenRotationButton = playbackSettings.showScreenRotationButton,
+                            seekDurationSeconds = playbackSettings.seekDurationSeconds,
+                            controlIconSize = playbackSettings.controlIconSize,
+                            topLeftButtons = topLeftButtons,
+                            topRightButtons = topRightButtons,
+                            bottomLeftButtons = bottomLeftButtons,
+                            bottomRightButtons = bottomRightButtons,
+                            portraitTopLeftButtons = portraitTopLeftButtons,
+                            portraitTopRightButtons = portraitTopRightButtons,
+                            portraitBottomButtons = portraitBottomButtons,
+                            onLockClick = { isLocked = true },
+                            onAspectClick = onCycleAspectMode,
+                            onPipClick = onEnterPip,
+                            currentAspectMode = playbackSettings.aspectMode,
+                            isBackgroundPlayEnabled = playbackSettings.backgroundPlayEnabled,
+                            onBackgroundPlayClick = {
+                                val newVal = !playbackSettings.backgroundPlayEnabled
+                                onUpdateBackgroundPlayEnabled(newVal)
+                                android.widget.Toast.makeText(
+                                    context,
+                                    if (newVal) "Background play enabled" else "Background play disabled",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            modifier = Modifier
+                        )
+                    }
                 }
 
                 // Separate Buffering overlay if video stalls during playback
@@ -656,6 +705,48 @@ fun PlayerScreen(
                             .size(56.dp)
                             .align(Alignment.Center)
                     )
+                }
+
+                // Aspect Ratio Overlay HUD
+                AnimatedVisibility(
+                    visible = aspectOverlayText != null,
+                    enter = fadeIn(animationSpec = tween(150)) + scaleIn(initialScale = 0.8f, animationSpec = tween(150)),
+                    exit = fadeOut(animationSpec = tween(150)) + scaleOut(targetScale = 0.8f, animationSpec = tween(150)),
+                    modifier = Modifier.align(Alignment.Center)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color.Black.copy(alpha = 0.75f))
+                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 24.dp, vertical = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            val overlayIcon = when (playbackSettings.aspectMode) {
+                                com.devson.nvplayer.player.AspectMode.FIT -> AspectIcons.Fit
+                                com.devson.nvplayer.player.AspectMode.STRETCH -> AspectIcons.Stretch
+                                com.devson.nvplayer.player.AspectMode.CROP -> AspectIcons.Crop
+                                com.devson.nvplayer.player.AspectMode.ORIGINAL -> AspectIcons.Original
+                            }
+                            Icon(
+                                imageVector = overlayIcon,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = aspectOverlayText ?: "",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }

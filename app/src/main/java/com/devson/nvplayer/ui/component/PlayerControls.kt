@@ -95,6 +95,9 @@ fun PlayerControls(
     onLockClick: () -> Unit = {},
     onAspectClick: () -> Unit = {},
     onPipClick: () -> Unit = {},
+    currentAspectMode: com.devson.nvplayer.player.AspectMode = com.devson.nvplayer.player.AspectMode.FIT,
+    isBackgroundPlayEnabled: Boolean = false,
+    onBackgroundPlayClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -216,7 +219,10 @@ fun PlayerControls(
                         onLockClick = onLockClick,
                         onAspectClick = onAspectClick,
                         onPipClick = onPipClick,
-                        activity = activity
+                        activity = activity,
+                        currentAspectMode = currentAspectMode,
+                        isBackgroundPlayEnabled = isBackgroundPlayEnabled,
+                        onBackgroundPlayClick = onBackgroundPlayClick
                     )
                 }
             }
@@ -249,7 +255,10 @@ fun PlayerControls(
                         onLockClick = onLockClick,
                         onAspectClick = onAspectClick,
                         onPipClick = onPipClick,
-                        activity = activity
+                        activity = activity,
+                        currentAspectMode = currentAspectMode,
+                        isBackgroundPlayEnabled = isBackgroundPlayEnabled,
+                        onBackgroundPlayClick = onBackgroundPlayClick
                     )
                 }
             }
@@ -440,7 +449,10 @@ fun PlayerControls(
                             onLockClick = onLockClick,
                             onAspectClick = onAspectClick,
                             onPipClick = onPipClick,
-                            activity = activity
+                            activity = activity,
+                            currentAspectMode = currentAspectMode,
+                            isBackgroundPlayEnabled = isBackgroundPlayEnabled,
+                            onBackgroundPlayClick = onBackgroundPlayClick
                         )
                     }
                 }
@@ -480,7 +492,10 @@ fun PlayerControls(
                                 onLockClick = onLockClick,
                                 onAspectClick = onAspectClick,
                                 onPipClick = onPipClick,
-                                activity = activity
+                                activity = activity,
+                                currentAspectMode = currentAspectMode,
+                                isBackgroundPlayEnabled = isBackgroundPlayEnabled,
+                                onBackgroundPlayClick = onBackgroundPlayClick
                             )
                         }
                     }
@@ -512,7 +527,10 @@ fun PlayerControls(
                                 onLockClick = onLockClick,
                                 onAspectClick = onAspectClick,
                                 onPipClick = onPipClick,
-                                activity = activity
+                                activity = activity,
+                                currentAspectMode = currentAspectMode,
+                                isBackgroundPlayEnabled = isBackgroundPlayEnabled,
+                                onBackgroundPlayClick = onBackgroundPlayClick
                             )
                         }
                     }
@@ -791,7 +809,10 @@ fun RenderPlayerButton(
     onLockClick: () -> Unit,
     onAspectClick: () -> Unit,
     onPipClick: () -> Unit,
-    activity: Activity?
+    activity: Activity?,
+    currentAspectMode: com.devson.nvplayer.player.AspectMode = com.devson.nvplayer.player.AspectMode.FIT,
+    isBackgroundPlayEnabled: Boolean = false,
+    onBackgroundPlayClick: () -> Unit = {}
 ) {
     if (button == com.devson.nvplayer.model.PlayerButton.VIDEO_TITLE) {
         Column(modifier = modifier) {
@@ -832,6 +853,7 @@ fun RenderPlayerButton(
             com.devson.nvplayer.model.PlayerButton.LOCK_CONTROLS -> onLockClick()
             com.devson.nvplayer.model.PlayerButton.PICTURE_IN_PICTURE -> onPipClick()
             com.devson.nvplayer.model.PlayerButton.ASPECT_RATIO -> onAspectClick()
+            com.devson.nvplayer.model.PlayerButton.BACKGROUND_PLAY -> onBackgroundPlayClick()
             com.devson.nvplayer.model.PlayerButton.SCREEN_ROTATION -> {
                 activity?.let { act ->
                     val currentOrientation = act.requestedOrientation
@@ -848,6 +870,7 @@ fun RenderPlayerButton(
     }
 
     val isSmartEnhance = button == com.devson.nvplayer.model.PlayerButton.SMART_ENHANCE
+    val isBgPlay = button == com.devson.nvplayer.model.PlayerButton.BACKGROUND_PLAY
 
     if (isPortrait) {
         Box(
@@ -856,6 +879,8 @@ fun RenderPlayerButton(
                 .then(
                     if (isSmartEnhance && isSmartEnhanceEnabled && glowBrush != null) {
                         Modifier.background(glowBrush)
+                    } else if (isBgPlay && isBackgroundPlayEnabled) {
+                        Modifier.background(themePrimary.copy(alpha = 0.25f))
                     } else {
                         Modifier.background(Color.White.copy(alpha = 0.08f))
                     }
@@ -872,6 +897,8 @@ fun RenderPlayerButton(
                             ),
                             shape = RoundedCornerShape(12.dp)
                         )
+                    } else if (isBgPlay && isBackgroundPlayEnabled) {
+                        Modifier.border(1.dp, themePrimary, RoundedCornerShape(12.dp))
                     } else {
                         Modifier.border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                     }
@@ -889,10 +916,20 @@ fun RenderPlayerButton(
                     modifier = Modifier.padding(horizontal = 4.dp)
                 )
             } else {
+                val icon = if (button == com.devson.nvplayer.model.PlayerButton.ASPECT_RATIO) {
+                    when (currentAspectMode) {
+                        com.devson.nvplayer.player.AspectMode.FIT -> AspectIcons.Fit
+                        com.devson.nvplayer.player.AspectMode.STRETCH -> AspectIcons.Stretch
+                        com.devson.nvplayer.player.AspectMode.CROP -> AspectIcons.Crop
+                        com.devson.nvplayer.player.AspectMode.ORIGINAL -> AspectIcons.Original
+                    }
+                } else {
+                    button.icon
+                }
                 Icon(
-                    imageVector = button.icon,
+                    imageVector = icon,
                     contentDescription = button.displayName,
-                    tint = if (isSmartEnhance && isSmartEnhanceEnabled) Color.White else Color.White.copy(alpha = 0.85f),
+                    tint = if ((isSmartEnhance && isSmartEnhanceEnabled) || (isBgPlay && isBackgroundPlayEnabled)) themePrimary else Color.White.copy(alpha = 0.85f),
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -905,6 +942,8 @@ fun RenderPlayerButton(
                 .then(
                     if (isSmartEnhance && isSmartEnhanceEnabled && glowBrush != null) {
                         Modifier.background(glowBrush)
+                    } else if (isBgPlay && isBackgroundPlayEnabled) {
+                        Modifier.background(themePrimary.copy(alpha = 0.25f))
                     } else {
                         Modifier.background(Color.White.copy(alpha = 0.08f))
                     }
@@ -921,6 +960,8 @@ fun RenderPlayerButton(
                             ),
                             shape = CircleShape
                         )
+                    } else if (isBgPlay && isBackgroundPlayEnabled) {
+                        Modifier.border(1.dp, themePrimary, CircleShape)
                     } else {
                         Modifier.border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
                     }
@@ -936,10 +977,20 @@ fun RenderPlayerButton(
                     fontWeight = FontWeight.Bold
                 )
             } else {
+                val icon = if (button == com.devson.nvplayer.model.PlayerButton.ASPECT_RATIO) {
+                    when (currentAspectMode) {
+                        com.devson.nvplayer.player.AspectMode.FIT -> AspectIcons.Fit
+                        com.devson.nvplayer.player.AspectMode.STRETCH -> AspectIcons.Stretch
+                        com.devson.nvplayer.player.AspectMode.CROP -> AspectIcons.Crop
+                        com.devson.nvplayer.player.AspectMode.ORIGINAL -> AspectIcons.Original
+                    }
+                } else {
+                    button.icon
+                }
                 Icon(
-                    imageVector = button.icon,
+                    imageVector = icon,
                     contentDescription = button.displayName,
-                    tint = if (isSmartEnhance && isSmartEnhanceEnabled) Color.White else Color.White.copy(alpha = 0.85f),
+                    tint = if ((isSmartEnhance && isSmartEnhanceEnabled) || (isBgPlay && isBackgroundPlayEnabled)) themePrimary else Color.White.copy(alpha = 0.85f),
                     modifier = Modifier.size(20.dp)
                 )
             }

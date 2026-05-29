@@ -35,5 +35,7 @@ interface PlayerEngine {
     fun setAudioBoost(boost: Boolean)
     fun setMpvVolume(volume: Double)
     fun setDecoder(mode: DecoderMode)
+    fun setAspectMode(mode: AspectMode)
+    fun setVideoTrackEnabled(enabled: Boolean)
     fun release()
 }

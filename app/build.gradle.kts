@@ -123,6 +123,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.graphics.shapes)
     implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.media:media:1.7.0")
     implementation("androidx.documentfile:documentfile:1.0.1")
 
     implementation(libs.androidx.core.ktx)

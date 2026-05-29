@@ -255,6 +255,16 @@ fun PlayerInterfaceSettingsScreen(
                     checked = playbackSettings.keepAwakeAlways,
                     onCheckedChange = { settingsViewModel.updateKeepAwakeAlways(it) }
                 )
+
+                InterfaceDivider()
+
+                InterfaceToggleRow(
+                    icon = Icons.Default.PlayArrow,
+                    title = "Background Playback",
+                    subtitle = "Continue playing audio in background when exiting the player",
+                    checked = playbackSettings.backgroundPlayEnabled,
+                    onCheckedChange = { settingsViewModel.updateBackgroundPlayEnabled(it) }
+                )
             }
 
             Spacer(Modifier.height(24.dp))

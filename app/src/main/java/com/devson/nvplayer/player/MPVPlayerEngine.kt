@@ -14,6 +14,9 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
     companion object {
         @Volatile
         var isInitialized = false
+
+        @Volatile
+        var activeInstance: MPVPlayerEngine? = null
     }
 
     private val _isPlaying = MutableStateFlow(false)
@@ -81,6 +84,7 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
 
             MPVLib.init()
             isInitialized = true
+            activeInstance = this
 
             // Register event listener
             MPVLib.addObserver(this)
@@ -362,8 +366,52 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
         }
     }
 
+    override fun setAspectMode(mode: AspectMode) {
+        Log.d("MPVPlayerEngine", "Setting aspect mode to: ${mode.name}")
+        try {
+            when (mode) {
+                AspectMode.FIT -> {
+                    MPVLib.setPropertyString("keepaspect", "yes")
+                    MPVLib.setPropertyDouble("panscan", 0.0)
+                    MPVLib.setPropertyString("video-unscaled", "no")
+                }
+                AspectMode.STRETCH -> {
+                    MPVLib.setPropertyString("keepaspect", "no")
+                    MPVLib.setPropertyDouble("panscan", 0.0)
+                    MPVLib.setPropertyString("video-unscaled", "no")
+                }
+                AspectMode.CROP -> {
+                    MPVLib.setPropertyString("keepaspect", "yes")
+                    MPVLib.setPropertyDouble("panscan", 1.0)
+                    MPVLib.setPropertyString("video-unscaled", "no")
+                }
+                AspectMode.ORIGINAL -> {
+                    MPVLib.setPropertyString("keepaspect", "yes")
+                    MPVLib.setPropertyDouble("panscan", 0.0)
+                    MPVLib.setPropertyString("video-unscaled", "yes")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MPVPlayerEngine", "Failed to set aspect mode", e)
+        }
+    }
+
+    override fun setVideoTrackEnabled(enabled: Boolean) {
+        Log.d("MPVPlayerEngine", "Setting video track enabled: $enabled")
+        try {
+            if (enabled) {
+                MPVLib.setPropertyString("vid", "auto")
+            } else {
+                MPVLib.setPropertyString("vid", "no")
+            }
+        } catch (e: Exception) {
+            Log.e("MPVPlayerEngine", "Failed to set video track enabled", e)
+        }
+    }
+
     override fun release() {
         Log.d("MPVPlayerEngine", "Releasing MPVPlayerEngine resources")
+        activeInstance = null
         try {
             MPVLib.removeObserver(this)
             MPVLib.destroy()
