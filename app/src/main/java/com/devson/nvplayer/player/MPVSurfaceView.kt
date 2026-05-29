@@ -31,6 +31,7 @@ class MPVSurfaceView @JvmOverloads constructor(
     }
 
     var onSurfaceCreatedListener: (() -> Unit)? = null
+    var onSurfaceDestroyedListener: (() -> Unit)? = null
 
     init {
         holder.addCallback(this)
@@ -72,5 +73,6 @@ class MPVSurfaceView @JvmOverloads constructor(
         } catch (e: Exception) {
             Log.e("MPVSurfaceView", "Error detaching surface from MPVLib", e)
         }
+        onSurfaceDestroyedListener?.invoke()
     }
 }

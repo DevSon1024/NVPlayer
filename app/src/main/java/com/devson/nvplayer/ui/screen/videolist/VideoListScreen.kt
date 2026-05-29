@@ -451,10 +451,28 @@ fun VideoListScreen(
                     VideoSelectionBottomBar(
                         selectedVideos = selectedVideos,
                         onFeedPlay = {
-                            val sorted = selectedVideos.toList().applySort(viewSettings.sortField, viewSettings.sortDirection)
-                            if (sorted.isNotEmpty()) {
-                                viewModel.setFeedVideos(sorted)
-                                onNavigateToFeed(0)
+                            // Determine the full current playlist depending on view mode
+                            val fullPlaylist: List<Video> = when (viewSettings.viewMode) {
+                                ViewMode.FILES -> {
+                                    val allVideos = videosByFolder.values.flatten()
+                                    allVideos.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                                }
+                                ViewMode.ALL_FOLDERS -> {
+                                    val folderVideos = videosByFolder[selectedFolder] ?: videosByFolder.values.flatten()
+                                    folderVideos.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                                }
+                                ViewMode.FOLDERS -> {
+                                    explorerNodes.second.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                                }
+                            }
+                            // Find start index: the first selected video in the full sorted playlist
+                            val firstSelected = selectedVideos.firstOrNull()
+                            val startIdx = if (firstSelected != null) {
+                                fullPlaylist.indexOfFirst { it.uri == firstSelected.uri }.takeIf { it >= 0 } ?: 0
+                            } else 0
+                            if (fullPlaylist.isNotEmpty()) {
+                                viewModel.setFeedVideos(fullPlaylist)
+                                onNavigateToFeed(startIdx)
                                 selectedVideos = emptySet()
                             }
                         },

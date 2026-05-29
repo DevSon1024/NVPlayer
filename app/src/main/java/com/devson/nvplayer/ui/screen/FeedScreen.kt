@@ -27,12 +27,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -71,6 +75,14 @@ fun FeedScreen(
     )
 
     var controlsVisible by remember { mutableStateOf(true) }
+
+    //  Status bar: force white icons so they are visible on the black feed background
+    val view = LocalView.current
+    SideEffect {
+        val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
+        val controller = WindowInsetsControllerCompat(window, view)
+        controller.isAppearanceLightStatusBars = false  // false = white icons
+    }
 
     // Push the video list into the VM once (or when the list reference changes).
     LaunchedEffect(videos) {
@@ -147,6 +159,8 @@ fun FeedScreen(
                 controlsVisible = controlsVisible,
                 onControlsVisibleChange = { controlsVisible = it },
                 onSpeedChange = { speed -> viewModel.setPlaybackSpeed(speed) },
+                onSurfaceAttached = { viewModel.onSurfaceAttached() },
+                onSurfaceDetached = { viewModel.onSurfaceDetached() },
                 onTitleClick = {
                     viewModel.skipPauseOnDispose = true
                     onPlayVideoInPlayer(video, filteredVideos)
@@ -185,7 +199,7 @@ fun FeedScreen(
             )
         }
 
-        // Slim seekbar at the bottom
+        // Slim seekbar + remaining-time at the bottom
         AnimatedVisibility(
             visible = controlsVisible,
             enter = fadeIn(tween(200)),
@@ -198,38 +212,50 @@ fun FeedScreen(
         ) {
             val currentPos by viewModel.currentPosition.collectAsState()
             val videoDuration by viewModel.duration.collectAsState()
+            val remaining = (videoDuration - currentPos).coerceAtLeast(0L)
 
-            Slider(
-                value = currentPos.toFloat(),
-                onValueChange = { newVal ->
-                    viewModel.seekTo(newVal.toLong())
-                },
-                valueRange = 0f..videoDuration.coerceAtLeast(1L).toFloat(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(16.dp),
-                colors = SliderDefaults.colors(
-                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.25f)
-                ),
-                track = { sliderState ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(2.dp))
-                    ) {
-                        val fraction = if (videoDuration > 0) sliderState.value / videoDuration.toFloat() else 0f
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Remaining time label aligned to the right
+                Text(
+                    text = "-${formatDuration(remaining)}",
+                    color = Color.White.copy(alpha = 0.75f),
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Slider(
+                    value = currentPos.toFloat(),
+                    onValueChange = { newVal ->
+                        viewModel.seekTo(newVal.toLong())
+                    },
+                    valueRange = 0f..videoDuration.coerceAtLeast(1L).toFloat(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(16.dp),
+                    colors = SliderDefaults.colors(
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.25f)
+                    ),
+                    track = { sliderState ->
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                                .fillMaxWidth()
                                 .height(4.dp)
-                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
-                        )
-                    }
-                },
-                thumb = {}
-            )
+                                .background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(2.dp))
+                        ) {
+                            val fraction = if (videoDuration > 0) sliderState.value / videoDuration.toFloat() else 0f
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                                    .height(4.dp)
+                                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
+                            )
+                        }
+                    },
+                    thumb = {}
+                )
+            }
         }
     }
 }
@@ -248,6 +274,8 @@ private fun FeedPage(
     controlsVisible: Boolean,
     onControlsVisibleChange: (Boolean) -> Unit,
     onSpeedChange: (Float) -> Unit,
+    onSurfaceAttached: () -> Unit,
+    onSurfaceDetached: () -> Unit,
     onTitleClick: () -> Unit,
     onTogglePlay: () -> Unit,
     modifier: Modifier = Modifier
@@ -344,15 +372,26 @@ private fun FeedPage(
     ) {
         //  Video surface (active page only) or thumbnail (inactive pages) 
         if (isActive) {
-            // The real MPV surface. AndroidView keeps the SurfaceView instance
-            // stable across recompositions so MPVLib's surface callbacks fire
-            // correctly (created → attached → changed → detached).
+            // Keep callbacks fresh across recompositions
+            val latestOnSurfaceAttached by rememberUpdatedState(onSurfaceAttached)
+            val latestOnSurfaceDetached by rememberUpdatedState(onSurfaceDetached)
+
+            // AndroidView keeps the MPVSurfaceView instance stable so MPVLib
+            // surface callbacks fire correctly (created → changed → destroyed).
+            // Surface callbacks are wired to notify the ViewModel so it can
+            // gate loadVideo() until a surface is actually available (fixes the
+            // blank-screen-on-cold-start race condition).
             AndroidView(
                 factory = { ctx ->
-                    MPVSurfaceView(ctx).also { view ->
-                        // surfaceCreated fires automatically via SurfaceHolder.Callback.
-                        // Nothing extra needed here.
+                    MPVSurfaceView(ctx).also { mpvView ->
+                        mpvView.onSurfaceCreatedListener = { latestOnSurfaceAttached() }
+                        mpvView.onSurfaceDestroyedListener = { latestOnSurfaceDetached() }
                     }
+                },
+                update = { mpvView ->
+                    // Refresh listener references so the latest ViewModel callbacks are used
+                    mpvView.onSurfaceCreatedListener = { latestOnSurfaceAttached() }
+                    mpvView.onSurfaceDestroyedListener = { latestOnSurfaceDetached() }
                 },
                 modifier = Modifier.fillMaxSize()
             )

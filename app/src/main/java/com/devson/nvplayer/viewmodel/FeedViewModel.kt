@@ -83,6 +83,43 @@ class FeedViewModel(
     val currentPosition: StateFlow<Long> = engine.currentPosition
     val duration: StateFlow<Long> = engine.duration
 
+    //  Surface-ready gate 
+    // MPV's GPU video output (vo=gpu, gpu-context=android) must have an Android
+    // Surface attached BEFORE loadfile is called, otherwise the VO initialises
+    // against a null surface, falls back to audio-only, and never retries even
+    // after the surface is later attached (= blank black screen on first launch).
+    //
+    // We therefore:
+    //   1. Track whether the MPVSurfaceView surface is currently attached.
+    //   2. If onPageSettled() fires before the surface is ready we store the
+    //      URI as pendingVideoUri and skip the loadVideo() call.
+    //   3. When onSurfaceAttached() is called we immediately load any pending
+    //      URI so playback begins the moment the surface is available.
+    @Volatile private var isSurfaceReady = false
+    @Volatile private var pendingVideoUri: String? = null
+
+    /** Called from FeedPage when MPVSurfaceView.surfaceCreated fires. */
+    fun onSurfaceAttached() {
+        isSurfaceReady = true
+        val uri = pendingVideoUri ?: return
+        pendingVideoUri = null
+        Log.d(TAG, "Surface attached – loading pending video: $uri")
+        viewModelScope.launch {
+            try {
+                engine.setPlaybackSpeed(1.0f)
+                engine.loadVideo(Uri.parse(uri))
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load pending video after surface attach", e)
+            }
+        }
+    }
+
+    /** Called from FeedPage when MPVSurfaceView.surfaceDestroyed fires. */
+    fun onSurfaceDetached() {
+        isSurfaceReady = false
+        Log.d(TAG, "Surface detached")
+    }
+
     fun setVideos(list: List<Video>) {
         _videos.value = list
         Log.d(TAG, "Feed loaded with ${list.size} videos")
@@ -109,6 +146,14 @@ class FeedViewModel(
         _currentVideoUri.value = video.uri
         _currentIndex.value = index
         Log.d(TAG, "Page settled -> index=$index uri=${video.uri}")
+
+        if (!isSurfaceReady) {
+            // Surface not attached yet (cold start race). Queue the load so
+            // onSurfaceAttached() can execute it as soon as the surface exists.
+            Log.d(TAG, "Surface not ready – queuing video load for: ${video.uri}")
+            pendingVideoUri = video.uri
+            return
+        }
 
         viewModelScope.launch {
             try {
