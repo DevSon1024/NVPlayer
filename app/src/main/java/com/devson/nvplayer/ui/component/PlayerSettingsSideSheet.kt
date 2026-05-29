@@ -86,7 +86,7 @@ fun PlayerSettingsSideSheet(
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val sheetWidthPercent = if (isLandscape) 0.5f else 0.75f
+    val sheetWidthPercent = if (isLandscape) 0.5f else 1.0f
 
     var activeTab by remember { mutableStateOf(0) }
 
@@ -101,7 +101,7 @@ fun PlayerSettingsSideSheet(
 
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.CenterEnd
+        contentAlignment = if (isLandscape) Alignment.CenterEnd else Alignment.BottomCenter
     ) {
         // Scrim
         AnimatedVisibility(
@@ -123,34 +123,82 @@ fun PlayerSettingsSideSheet(
         }
 
         // Sheet Content
-        AnimatedVisibility(
-            visible = visible,
-            enter = slideInHorizontally(
+        val enterAnim = if (isLandscape) {
+            slideInHorizontally(
                 initialOffsetX = { it },
                 animationSpec = tween(300, easing = LinearOutSlowInEasing)
-            ),
-            exit = slideOutHorizontally(
+            )
+        } else {
+            slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = tween(300, easing = LinearOutSlowInEasing)
+            )
+        }
+
+        val exitAnim = if (isLandscape) {
+            slideOutHorizontally(
                 targetOffsetX = { it },
                 animationSpec = tween(300, easing = FastOutLinearInEasing)
-            ),
-            modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(sheetWidthPercent)
+            )
+        } else {
+            slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(300, easing = FastOutLinearInEasing)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = visible,
+            enter = enterAnim,
+            exit = exitAnim,
+            modifier = if (isLandscape) {
+                Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(sheetWidthPercent)
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(Alignment.Bottom)
+            }
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.88f))
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
-                    )
+                modifier = if (isLandscape) {
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.88f))
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+                        )
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .heightIn(max = (configuration.screenHeightDp * 0.9f).dp)
+                        .animateContentSize(animationSpec = tween(300, easing = FastOutSlowInEasing))
+                        .background(
+                            color = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
+                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                        )
+                }
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .systemBarsPadding()
+                    modifier = if (isLandscape) {
+                        Modifier
+                            .fillMaxSize()
+                            .systemBarsPadding()
+                    } else {
+                        Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .statusBarsPadding()
+                    }
                 ) {
                     Row(
                         modifier = Modifier
@@ -239,7 +287,10 @@ fun PlayerSettingsSideSheet(
                     // Active Tab body
                     Column(
                         modifier = Modifier
-                            .weight(1f)
+                            .then(
+                                if (isLandscape) Modifier.weight(1f)
+                                else Modifier.weight(1f, fill = false)
+                            )
                             .padding(horizontal = 24.dp)
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -1164,7 +1215,7 @@ private fun SheetCard(content: @Composable ColumnScope.() -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
         )
     ) {
         Column(content = content)

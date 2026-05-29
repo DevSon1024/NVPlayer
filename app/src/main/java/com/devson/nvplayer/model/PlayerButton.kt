@@ -9,7 +9,7 @@ import androidx.compose.material.icons.rounded.*
 enum class PlayerButton(val displayName: String, val icon: ImageVector) {
     BACK_ARROW("Back", Icons.AutoMirrored.Rounded.ArrowBack),
     VIDEO_TITLE("Title", Icons.Rounded.Title),
-    SUBTITLES("Subtitles", Icons.Rounded.ClosedCaption),
+    SUBTITLES("Subtitles", Icons.Rounded.Subtitles),
     AUDIO_TRACK("Audio", Icons.Rounded.Audiotrack),
     DECODER("Decoder", Icons.Rounded.Memory),
     CHAPTERS("Chapters", Icons.AutoMirrored.Rounded.FormatListBulleted),

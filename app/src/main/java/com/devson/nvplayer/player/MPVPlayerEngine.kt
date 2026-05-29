@@ -279,7 +279,7 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
             val audios = mutableListOf<TrackInfo>()
             
             // Add fallback/disable option for subtitle
-            subs.add(TrackInfo(-1, "sub", "None", false))
+            subs.add(TrackInfo(-1, "sub", "None (Disabled)", false))
             
             for (i in 0 until count) {
                 val type = MPVLib.getPropertyString("track-list/$i/type") ?: ""

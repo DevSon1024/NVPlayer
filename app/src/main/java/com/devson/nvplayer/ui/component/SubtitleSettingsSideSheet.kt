@@ -4,11 +4,17 @@ import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.animateContentSize
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,11 +68,14 @@ fun SubtitleSettingsSideSheet(
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val sheetWidthPercent = if (isLandscape) 0.5f else 0.75f
+    val sheetWidthPercent = if (isLandscape) 0.5f else 1.0f
+
+    var styleOptionsExpanded by remember { mutableStateOf(false) }
+    var syncOptionsExpanded by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.CenterEnd
+        contentAlignment = if (isLandscape) Alignment.CenterEnd else Alignment.BottomCenter
     ) {
         // Scrim
         AnimatedVisibility(
@@ -78,7 +87,7 @@ fun SubtitleSettingsSideSheet(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.45f))
+                    .background(if (isLandscape) Color.Black.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.1f))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -88,35 +97,84 @@ fun SubtitleSettingsSideSheet(
         }
 
         // Sheet Content
-        AnimatedVisibility(
-            visible = visible,
-            enter = slideInHorizontally(
+        val enterAnim = if (isLandscape) {
+            slideInHorizontally(
                 initialOffsetX = { it },
                 animationSpec = tween(durationMillis = 300, easing = LinearOutSlowInEasing)
-            ),
-            exit = slideOutHorizontally(
+            )
+        } else {
+            slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = tween(durationMillis = 300, easing = LinearOutSlowInEasing)
+            )
+        }
+
+        val exitAnim = if (isLandscape) {
+            slideOutHorizontally(
                 targetOffsetX = { it },
                 animationSpec = tween(durationMillis = 300, easing = FastOutLinearInEasing)
-            ),
-            modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(sheetWidthPercent)
+            )
+        } else {
+            slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(durationMillis = 300, easing = FastOutLinearInEasing)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = visible,
+            enter = enterAnim,
+            exit = exitAnim,
+            modifier = if (isLandscape) {
+                Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(sheetWidthPercent)
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(Alignment.Bottom)
+            }
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.88f))
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
-                    )
+                modifier = if (isLandscape) {
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.88f))
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+                        )
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .heightIn(max = (configuration.screenHeightDp * 0.6f).dp)
+                        .animateContentSize(animationSpec = tween(300, easing = FastOutSlowInEasing))
+                        .background(
+                            color = MaterialTheme.colorScheme.background.copy(alpha = 0.65f),
+                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                        )
+                }
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .systemBarsPadding()
-                        .padding(horizontal = 24.dp, vertical = 20.dp)
+                    modifier = if (isLandscape) {
+                        Modifier
+                            .fillMaxSize()
+                            .systemBarsPadding()
+                            .padding(horizontal = 24.dp, vertical = 20.dp)
+                    } else {
+                        Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .statusBarsPadding()
+                            .padding(horizontal = 24.dp, vertical = 20.dp)
+                    }
                 ) {
                     // Header
                     Row(
@@ -154,20 +212,16 @@ fun SubtitleSettingsSideSheet(
                     // Scrollable content
                     Column(
                         modifier = Modifier
-                            .weight(1f)
+                            .then(
+                                if (isLandscape) Modifier.weight(1f)
+                                else Modifier.weight(1f, fill = false)
+                            )
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(24.dp)
                     ) {
                         // Section 1: Subtitle Tracks
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             SectionHeader(title = "Subtitle Tracks")
-
-                            val isNoSubtitleSelected = subtitleTracks.none { it.selected }
-                            // TrackItem(
-                            //     title = "None (Disabled)",
-                            //     isSelected = isNoSubtitleSelected,
-                            //     onClick = { onSelectSubtitleTrack(-1) }
-                            // )
 
                             subtitleTracks.forEach { track ->
                                 TrackItem(
@@ -181,339 +235,383 @@ fun SubtitleSettingsSideSheet(
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
                         // Section 2: Styling
-                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            SectionHeader(title = "Style Options")
-
-                            // Text Size slider
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Text Size Scale",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = "%.1fx".format(playbackSettings.subtitleTextSizeScale),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 4.dp)
-                                ) {
-                                    LongPressStepButton(
-                                        icon = Icons.Rounded.Remove,
-                                        contentDescription = "Decrease size",
-                                        onStep = {
-                                            val newScale = (playbackSettings.subtitleTextSizeScale - 0.1f)
-                                                .coerceAtLeast(0.5f)
-                                                .roundToTwoDecimals()
-                                            onUpdateSubtitleTextSizeScale(newScale)
-                                        }
-                                    )
-                                    Slider(
-                                        value = playbackSettings.subtitleTextSizeScale,
-                                        onValueChange = { onUpdateSubtitleTextSizeScale(it.roundToTwoDecimals()) },
-                                        valueRange = 0.5f..3.0f,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    LongPressStepButton(
-                                        icon = Icons.Rounded.Add,
-                                        contentDescription = "Increase size",
-                                        onStep = {
-                                            val newScale = (playbackSettings.subtitleTextSizeScale + 0.1f)
-                                                .coerceAtMost(3.0f)
-                                                .roundToTwoDecimals()
-                                            onUpdateSubtitleTextSizeScale(newScale)
-                                        }
-                                    )
-                                }
+                        Column {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { styleOptionsExpanded = !styleOptionsExpanded }
+                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                SectionHeader(title = "Style Options")
+                                Icon(
+                                    imageVector = if (styleOptionsExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                                    contentDescription = if (styleOptionsExpanded) "Collapse" else "Expand",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                             }
 
-                            // Font Family
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = "Font Family",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            AnimatedVisibility(visible = styleOptionsExpanded) {
+                                Column(
+                                    modifier = Modifier.padding(top = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
-                                    SubtitleFont.values().forEach { font ->
-                                        val isSelected = playbackSettings.subtitleFont == font
-                                        val fontName = when (font) {
-                                            SubtitleFont.DEFAULT -> "Default"
-                                            SubtitleFont.MONOSPACE -> "Mono"
-                                            SubtitleFont.SANS_SERIF -> "Sans"
-                                            SubtitleFont.SERIF -> "Serif"
-                                        }
-                                        val fontFamily = when (font) {
-                                            SubtitleFont.DEFAULT -> FontFamily.Default
-                                            SubtitleFont.MONOSPACE -> FontFamily.Monospace
-                                            SubtitleFont.SANS_SERIF -> FontFamily.SansSerif
-                                            SubtitleFont.SERIF -> FontFamily.Serif
-                                        }
-                                        val containerColor = if (isSelected) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-                                        }
-                                        val contentColor = if (isSelected) {
-                                            MaterialTheme.colorScheme.onPrimary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface
-                                        }
-
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(containerColor)
-                                                .clickable { onUpdateSubtitleFont(font) }
-                                                .padding(vertical = 10.dp),
-                                            contentAlignment = Alignment.Center
+                                    // Text Size slider
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                text = fontName,
-                                                fontFamily = fontFamily,
-                                                fontSize = 13.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                color = contentColor
+                                                text = "Text Size Scale",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                text = "%.1fx".format(playbackSettings.subtitleTextSizeScale),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 4.dp)
+                                        ) {
+                                            LongPressStepButton(
+                                                icon = Icons.Rounded.Remove,
+                                                contentDescription = "Decrease size",
+                                                onStep = {
+                                                    val newScale = (playbackSettings.subtitleTextSizeScale - 0.1f)
+                                                        .coerceAtLeast(0.5f)
+                                                        .roundToTwoDecimals()
+                                                    onUpdateSubtitleTextSizeScale(newScale)
+                                                }
+                                            )
+                                            Slider(
+                                                value = playbackSettings.subtitleTextSizeScale,
+                                                onValueChange = { onUpdateSubtitleTextSizeScale(it.roundToTwoDecimals()) },
+                                                valueRange = 0.5f..3.0f,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            LongPressStepButton(
+                                                icon = Icons.Rounded.Add,
+                                                contentDescription = "Increase size",
+                                                onStep = {
+                                                    val newScale = (playbackSettings.subtitleTextSizeScale + 0.1f)
+                                                        .coerceAtMost(3.0f)
+                                                        .roundToTwoDecimals()
+                                                    onUpdateSubtitleTextSizeScale(newScale)
+                                                }
                                             )
                                         }
                                     }
-                                }
-                            }
 
-                            // Background Style
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = "Background Style",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    listOf(
-                                        0 to "None",
-                                        1 to "Glass",
-                                        2 to "Solid Black"
-                                    ).forEach { (styleId, styleName) ->
-                                        val isSelected = playbackSettings.subtitleBgStyle == styleId
-                                        val containerColor = if (isSelected) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-                                        }
-                                        val contentColor = if (isSelected) {
-                                            MaterialTheme.colorScheme.onPrimary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface
-                                        }
-
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(containerColor)
-                                                .clickable { onUpdateSubtitleBgStyle(styleId) }
-                                                .padding(vertical = 10.dp),
-                                            contentAlignment = Alignment.Center
+                                    // Font Family
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Text(
+                                            text = "Font Family",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
-                                            Text(
-                                                text = styleName,
-                                                fontSize = 13.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                color = contentColor
-                                            )
+                                            SubtitleFont.values().forEach { font ->
+                                                val isSelected = playbackSettings.subtitleFont == font
+                                                val fontName = when (font) {
+                                                    SubtitleFont.DEFAULT -> "Default"
+                                                    SubtitleFont.MONOSPACE -> "Mono"
+                                                    SubtitleFont.SANS_SERIF -> "Sans"
+                                                    SubtitleFont.SERIF -> "Serif"
+                                                }
+                                                val fontFamily = when (font) {
+                                                    SubtitleFont.DEFAULT -> FontFamily.Default
+                                                    SubtitleFont.MONOSPACE -> FontFamily.Monospace
+                                                    SubtitleFont.SANS_SERIF -> FontFamily.SansSerif
+                                                    SubtitleFont.SERIF -> FontFamily.Serif
+                                                }
+                                                val containerColor = if (isSelected) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                                                }
+                                                val contentColor = if (isSelected) {
+                                                    MaterialTheme.colorScheme.onPrimary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurface
+                                                }
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(containerColor)
+                                                        .clickable { onUpdateSubtitleFont(font) }
+                                                        .padding(vertical = 10.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = fontName,
+                                                        fontFamily = fontFamily,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                        color = contentColor
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
+
+                                    // Background Style
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Text(
+                                            text = "Background Style",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            listOf(
+                                                0 to "None",
+                                                1 to "Glass",
+                                                2 to "Solid Black"
+                                            ).forEach { (styleId, styleName) ->
+                                                val isSelected = playbackSettings.subtitleBgStyle == styleId
+                                                val containerColor = if (isSelected) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                                                }
+                                                val contentColor = if (isSelected) {
+                                                    MaterialTheme.colorScheme.onPrimary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurface
+                                                }
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(containerColor)
+                                                        .clickable { onUpdateSubtitleBgStyle(styleId) }
+                                                        .padding(vertical = 10.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = styleName,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                        color = contentColor
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Toggles
+                                    ToggleRow(
+                                        title = "Bold Subtitles",
+                                        description = "Thicker and easier to read fonts",
+                                        checked = playbackSettings.isSubtitleBold,
+                                        onCheckedChange = onUpdateIsSubtitleBold
+                                    )
+
+                                    ToggleRow(
+                                        title = "Swipe & Drag Gestures",
+                                        description = "Drag subtitles to reposition, swipe to seek dialogs",
+                                        checked = playbackSettings.subtitleGesturesEnabled,
+                                        onCheckedChange = onUpdateSubtitleGesturesEnabled
+                                    )
+
+                                    ToggleRow(
+                                        title = "Override Embedded Style",
+                                        description = "Force styling settings on SSA/ASS formats",
+                                        checked = playbackSettings.forceAssSubtitleOverride,
+                                        onCheckedChange = onUpdateForceAssSubtitleOverride
+                                    )
                                 }
                             }
-
-                            // Toggles
-                            ToggleRow(
-                                title = "Bold Subtitles",
-                                description = "Thicker and easier to read fonts",
-                                checked = playbackSettings.isSubtitleBold,
-                                onCheckedChange = onUpdateIsSubtitleBold
-                            )
-
-                            ToggleRow(
-                                title = "Swipe & Drag Gestures",
-                                description = "Drag subtitles to reposition, swipe to seek dialogs",
-                                checked = playbackSettings.subtitleGesturesEnabled,
-                                onCheckedChange = onUpdateSubtitleGesturesEnabled
-                            )
-
-                            ToggleRow(
-                                title = "Override Embedded Style",
-                                description = "Force styling settings on SSA/ASS formats",
-                                checked = playbackSettings.forceAssSubtitleOverride,
-                                onCheckedChange = onUpdateForceAssSubtitleOverride
-                            )
                         }
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
                         // Section 3: Sync & Vertical Height Offset
-                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            SectionHeader(title = "Sync & Height Options")
-
-                            // Delay Control
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Subtitle Delay Sync",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = when {
-                                            playbackSettings.subtitleDelayMs > 0 -> "+${playbackSettings.subtitleDelayMs} ms"
-                                            playbackSettings.subtitleDelayMs < 0 -> "${playbackSettings.subtitleDelayMs} ms"
-                                            else -> "0 ms (Sync)"
-                                        },
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (playbackSettings.subtitleDelayMs != 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    LongPressTextButton(
-                                        text = "-100ms",
-                                        onClick = {
-                                            val newDelay = (playbackSettings.subtitleDelayMs - 100L).coerceIn(-600000L, 600000L)
-                                            onSetSubtitleDelay(newDelay)
-                                            onUpdateSubtitleDelay(newDelay)
-                                        },
-                                        modifier = Modifier.weight(1f).height(38.dp)
-                                    )
-
-                                    LongPressTextButton(
-                                        text = "-50ms",
-                                        onClick = {
-                                            val newDelay = (playbackSettings.subtitleDelayMs - 50L).coerceIn(-600000L, 600000L)
-                                            onSetSubtitleDelay(newDelay)
-                                            onUpdateSubtitleDelay(newDelay)
-                                        },
-                                        modifier = Modifier.weight(1f).height(38.dp)
-                                    )
-
-                                    IconButton(
-                                        onClick = { onSetSubtitleDelay(0L)
-                                                    onUpdateSubtitleDelay(0L) },
-                                        modifier = Modifier
-                                            .size(38.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.SettingsBackupRestore,
-                                            contentDescription = "Reset sync",
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-
-                                    LongPressTextButton(
-                                        text = "+50ms",
-                                        onClick = {
-                                            val newDelay = (playbackSettings.subtitleDelayMs + 50L).coerceIn(-600000L, 600000L)
-                                            onSetSubtitleDelay(newDelay)
-                                            onUpdateSubtitleDelay(newDelay)
-                                        },
-                                        modifier = Modifier.weight(1f).height(38.dp)
-                                    )
-
-                                    LongPressTextButton(
-                                        text = "+100ms",
-                                        onClick = {
-                                            val newDelay = (playbackSettings.subtitleDelayMs + 100L).coerceIn(-600000L, 600000L)
-                                            onSetSubtitleDelay(newDelay)
-                                            onUpdateSubtitleDelay(newDelay)
-                                        },
-                                        modifier = Modifier.weight(1f).height(38.dp)
-                                    )
-                                }
+                        Column {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { syncOptionsExpanded = !syncOptionsExpanded }
+                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                SectionHeader(title = "Sync & Height Options")
+                                Icon(
+                                    imageVector = if (syncOptionsExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                                    contentDescription = if (syncOptionsExpanded) "Collapse" else "Expand",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                             }
 
-                            // Vertical offset slider
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                            AnimatedVisibility(visible = syncOptionsExpanded) {
+                                Column(
+                                    modifier = Modifier.padding(top = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
-                                    Text(
-                                        text = "Vertical Alignment Height",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = "${(playbackSettings.subtitleVerticalOffset * 100).roundToInt()}%",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 4.dp)
-                                ) {
-                                    LongPressStepButton(
-                                        icon = Icons.Rounded.Remove,
-                                        contentDescription = "Lower subtitles",
-                                        onStep = {
-                                            val newOffset = (playbackSettings.subtitleVerticalOffset - 0.05f)
-                                                .coerceAtLeast(0f)
-                                                .roundToTwoDecimals()
-                                            onUpdateSubtitleVerticalOffset(newOffset)
+                                    // Delay Control
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Subtitle Delay Sync",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                text = when {
+                                                    playbackSettings.subtitleDelayMs > 0 -> "+${playbackSettings.subtitleDelayMs} ms"
+                                                    playbackSettings.subtitleDelayMs < 0 -> "${playbackSettings.subtitleDelayMs} ms"
+                                                    else -> "0 ms (Sync)"
+                                                },
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (playbackSettings.subtitleDelayMs != 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
                                         }
-                                    )
-                                    Slider(
-                                        value = playbackSettings.subtitleVerticalOffset,
-                                        onValueChange = { onUpdateSubtitleVerticalOffset(it.roundToTwoDecimals()) },
-                                        valueRange = 0f..0.85f,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    LongPressStepButton(
-                                        icon = Icons.Rounded.Add,
-                                        contentDescription = "Raise subtitles",
-                                        onStep = {
-                                            val newOffset = (playbackSettings.subtitleVerticalOffset + 0.05f)
-                                                .coerceAtMost(0.85f)
-                                                .roundToTwoDecimals()
-                                            onUpdateSubtitleVerticalOffset(newOffset)
+
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 8.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            LongPressTextButton(
+                                                text = "-100ms",
+                                                onClick = {
+                                                    val newDelay = (playbackSettings.subtitleDelayMs - 100L).coerceIn(-600000L, 600000L)
+                                                    onSetSubtitleDelay(newDelay)
+                                                    onUpdateSubtitleDelay(newDelay)
+                                                },
+                                                modifier = Modifier.weight(1f).height(38.dp)
+                                            )
+
+                                            LongPressTextButton(
+                                                text = "-50ms",
+                                                onClick = {
+                                                    val newDelay = (playbackSettings.subtitleDelayMs - 50L).coerceIn(-600000L, 600000L)
+                                                    onSetSubtitleDelay(newDelay)
+                                                    onUpdateSubtitleDelay(newDelay)
+                                                },
+                                                modifier = Modifier.weight(1f).height(38.dp)
+                                            )
+
+                                            IconButton(
+                                                onClick = { onSetSubtitleDelay(0L)
+                                                            onUpdateSubtitleDelay(0L) },
+                                                modifier = Modifier
+                                                    .size(38.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.SettingsBackupRestore,
+                                                    contentDescription = "Reset sync",
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+
+                                            LongPressTextButton(
+                                                text = "+50ms",
+                                                onClick = {
+                                                    val newDelay = (playbackSettings.subtitleDelayMs + 50L).coerceIn(-600000L, 600000L)
+                                                    onSetSubtitleDelay(newDelay)
+                                                    onUpdateSubtitleDelay(newDelay)
+                                                },
+                                                modifier = Modifier.weight(1f).height(38.dp)
+                                            )
+
+                                            LongPressTextButton(
+                                                text = "+100ms",
+                                                onClick = {
+                                                    val newDelay = (playbackSettings.subtitleDelayMs + 100L).coerceIn(-600000L, 600000L)
+                                                    onSetSubtitleDelay(newDelay)
+                                                    onUpdateSubtitleDelay(newDelay)
+                                                },
+                                                modifier = Modifier.weight(1f).height(38.dp)
+                                            )
                                         }
-                                    )
+                                    }
+
+                                    // Vertical offset slider
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Vertical Alignment Height",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                text = "${(playbackSettings.subtitleVerticalOffset * 100).roundToInt()}%",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 4.dp)
+                                        ) {
+                                            LongPressStepButton(
+                                                icon = Icons.Rounded.Remove,
+                                                contentDescription = "Lower subtitles",
+                                                onStep = {
+                                                    val newOffset = (playbackSettings.subtitleVerticalOffset - 0.05f)
+                                                        .coerceAtLeast(0f)
+                                                        .roundToTwoDecimals()
+                                                    onUpdateSubtitleVerticalOffset(newOffset)
+                                                }
+                                            )
+                                            Slider(
+                                                value = playbackSettings.subtitleVerticalOffset,
+                                                onValueChange = { onUpdateSubtitleVerticalOffset(it.roundToTwoDecimals()) },
+                                                valueRange = 0f..0.85f,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            LongPressStepButton(
+                                                icon = Icons.Rounded.Add,
+                                                contentDescription = "Raise subtitles",
+                                                onStep = {
+                                                    val newOffset = (playbackSettings.subtitleVerticalOffset + 0.05f)
+                                                        .coerceAtMost(0.85f)
+                                                        .roundToTwoDecimals()
+                                                    onUpdateSubtitleVerticalOffset(newOffset)
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
