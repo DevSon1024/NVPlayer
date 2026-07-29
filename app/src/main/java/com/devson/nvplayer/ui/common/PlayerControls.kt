@@ -112,6 +112,7 @@ fun PlayerControls(
     isBottomLayoutEnabled: Boolean = false,
     showControlGradients: Boolean = true,
     onTitleClick: () -> Unit = {},
+    onScreenshotClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -257,7 +258,8 @@ fun PlayerControls(
                 onBackgroundPlayClick = onBackgroundPlayClick,
                 ytdlQuality = ytdlQuality,
                 onShowQuality = onShowQuality,
-                onTitleClick = onTitleClick
+                onTitleClick = onTitleClick,
+                onScreenshotClick = onScreenshotClick
             )
         }
 
@@ -537,7 +539,8 @@ fun PlayerControls(
                         onBackgroundPlayClick = onBackgroundPlayClick,
                         ytdlQuality = ytdlQuality,
                         onShowQuality = onShowQuality,
-                        onTitleClick = onTitleClick
+                        onTitleClick = onTitleClick,
+                        onScreenshotClick = onScreenshotClick
                     )
                 }
             }
@@ -575,7 +578,8 @@ fun PlayerControls(
                         onBackgroundPlayClick = onBackgroundPlayClick,
                         ytdlQuality = ytdlQuality,
                         onShowQuality = onShowQuality,
-                        onTitleClick = onTitleClick
+                        onTitleClick = onTitleClick,
+                        onScreenshotClick = onScreenshotClick
                     )
                 }
             }
@@ -927,7 +931,8 @@ fun PlayerControls(
                                         currentAspectMode = currentAspectMode,
                                         isBackgroundPlayEnabled = isBackgroundPlayEnabled,
                                         onBackgroundPlayClick = onBackgroundPlayClick,
-                                        onTitleClick = onTitleClick
+                                        onTitleClick = onTitleClick,
+                                        onScreenshotClick = onScreenshotClick
                                     )
                                 }
                             }
@@ -961,7 +966,8 @@ fun PlayerControls(
                                 currentAspectMode = currentAspectMode,
                                 isBackgroundPlayEnabled = isBackgroundPlayEnabled,
                                 onBackgroundPlayClick = onBackgroundPlayClick,
-                                onTitleClick = onTitleClick
+                                onTitleClick = onTitleClick,
+                                onScreenshotClick = onScreenshotClick
                             )
                         }
                     }
@@ -1118,7 +1124,8 @@ fun RenderPlayerButton(
     onBackgroundPlayClick: () -> Unit = {},
     ytdlQuality: Int = -1,
     onShowQuality: () -> Unit = {},
-    onTitleClick: () -> Unit = {}
+    onTitleClick: () -> Unit = {},
+    onScreenshotClick: () -> Unit = {}
 ) {
     if (button == PlayerButton.VIDEO_TITLE) {
         Column(
@@ -1155,6 +1162,7 @@ fun RenderPlayerButton(
             PlayerButton.ASPECT_RATIO -> onAspectClick()
             PlayerButton.BACKGROUND_PLAY -> onBackgroundPlayClick()
             PlayerButton.STREAM_QUALITY -> onShowQuality()
+            PlayerButton.SCREENSHOT -> onScreenshotClick()
             PlayerButton.SCREEN_ROTATION -> {
                 activity?.let { act ->
                     val currentOrientation = act.requestedOrientation

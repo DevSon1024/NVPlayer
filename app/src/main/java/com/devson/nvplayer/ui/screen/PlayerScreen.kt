@@ -825,6 +825,7 @@ fun PlayerScreen(
                                     onQueueVisibleChange(true)
                                 }
                              },
+                             onScreenshotClick = onTakeVideoScreenshot,
                              ytdlQuality = playbackSettings.ytdlQuality,
                             onShowQuality = { showQualitySideSheet = true },
                             modifier = Modifier

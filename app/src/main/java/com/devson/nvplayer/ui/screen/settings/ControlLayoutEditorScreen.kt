@@ -551,6 +551,7 @@ fun ControlLayoutEditorScreen(
                                         PlayerButton.ASPECT_RATIO -> "Switch video aspect ratios (fit, stretch, zoom)"
                                         PlayerButton.MORE_OPTIONS -> "Open speed controls and advanced settings"
                                         PlayerButton.BACKGROUND_PLAY -> "Toggle background audio playback mode"
+                                        PlayerButton.SCREENSHOT -> "Take a screenshot of the current video frame"
                                         else -> ""
                                     },
                                     style = MaterialTheme.typography.bodySmall,

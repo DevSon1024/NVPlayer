@@ -7,7 +7,9 @@ import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.os.Environment
+import android.media.MediaScannerConnection
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -1042,18 +1044,95 @@ class PlayerViewModel(
             val context = getApplication<Application>()
             val location = playbackSettings.value.screenshotLocation
             val resolvedPath = getPhysicalPathFromTreeUri(context, location)
-            
+            val dir = File(resolvedPath)
+            if (!dir.exists()) {
+                dir.mkdirs()
+            }
+
+            var rawTitle = mediaTitle.value.trim()
+            if (rawTitle.isBlank() || rawTitle.all { it.isDigit() } || rawTitle.startsWith("content://")) {
+                val resolved = getDisplayNameFromUri(context, currentUri.value)
+                if (!resolved.isNullOrBlank()) {
+                    rawTitle = resolved
+                }
+            }
+
+            // Strip video extension if present
+            val dotIdx = rawTitle.lastIndexOf('.')
+            if (dotIdx > 0 && dotIdx < rawTitle.length - 1) {
+                rawTitle = rawTitle.substring(0, dotIdx)
+            }
+
+            if (rawTitle.isBlank() || rawTitle.all { it.isDigit() }) {
+                rawTitle = "Video"
+            }
+
+            val sanitizedTitle = rawTitle.replace(Regex("[^a-zA-Z0-9._-]"), "_").take(60)
+            val posMs = currentPosition.value
+
+            var fileName = "NVPlayerScreenshot_${sanitizedTitle}_${posMs}.png"
+            var outputFile = File(dir, fileName)
+            if (outputFile.exists()) {
+                fileName = "NVPlayerScreenshot_${sanitizedTitle}_${posMs}_${System.currentTimeMillis()}.png"
+                outputFile = File(dir, fileName)
+            }
+
             try {
                 withContext(Dispatchers.IO) {
-                    `is`.xyz.mpv.MPVLib.setOptionString("screenshot-directory", resolvedPath)
-                    `is`.xyz.mpv.MPVLib.command("screenshot", "video")
+                    `is`.xyz.mpv.MPVLib.command("screenshot-to-file", outputFile.absolutePath, "video")
                 }
-                Toast.makeText(context, "Screenshot saved to: $resolvedPath", Toast.LENGTH_SHORT).show()
+
+                MediaScannerConnection.scanFile(
+                    context,
+                    arrayOf(outputFile.absolutePath),
+                    arrayOf("image/png")
+                ) { path, uri ->
+                    Log.d("PlayerViewModel", "Screenshot indexed into MediaStore: $path -> $uri")
+                }
+
+                Toast.makeText(context, "Screenshot saved to: ${outputFile.name}", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Log.e("PlayerViewModel", "Failed to take video screenshot", e)
                 Toast.makeText(context, "Screenshot failed: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun getDisplayNameFromUri(context: Context, uri: Uri?): String? {
+        if (uri == null) return null
+        if (uri.scheme == "content") {
+            try {
+                context.contentResolver.query(
+                    uri,
+                    arrayOf(MediaStore.MediaColumns.DISPLAY_NAME),
+                    null, null, null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val colIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
+                        if (colIdx >= 0) {
+                            val displayName = cursor.getString(colIdx)
+                            if (!displayName.isNullOrBlank()) {
+                                return displayName
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("PlayerViewModel", "Error querying display name from ContentResolver", e)
+            }
+        }
+        val path = uri.path
+        if (path != null) {
+            val file = File(path)
+            if (file.name.isNotBlank() && !file.name.all { it.isDigit() }) {
+                return file.name
+            }
+        }
+        val lastSegment = uri.lastPathSegment
+        if (lastSegment != null && !lastSegment.all { it.isDigit() }) {
+            return lastSegment
+        }
+        return null
     }
 
     private fun getPhysicalPathFromTreeUri(context: Context, uriString: String): String {
