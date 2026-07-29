@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.res.stringResource
+import com.devson.nvplayer.R
 import com.devson.nvplayer.data.repository.DoubleTapAction
 import com.devson.nvplayer.data.repository.FullScreenMode
 import com.devson.nvplayer.data.repository.OrientationMode
@@ -87,6 +89,7 @@ fun PlayerSettingsSideSheet(
     onUpdateIsBottomLayoutEnabled: (Boolean) -> Unit = {},
     onUpdateShowControlGradients: (Boolean) -> Unit = {},
     onUpdateShowUpNextQueue: (Boolean) -> Unit = {},
+    onUpdateIsAmbientModeEnabled: (Boolean) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
@@ -339,7 +342,8 @@ fun PlayerSettingsSideSheet(
                             3 -> OverlaysTab(
                                 playbackSettings = playbackSettings,
                                 onUpdateShowRemainingTime = onUpdateShowRemainingTime,
-                                onUpdateShowBatteryClockOverlay = onUpdateShowBatteryClockOverlay
+                                onUpdateShowBatteryClockOverlay = onUpdateShowBatteryClockOverlay,
+                                onUpdateIsAmbientModeEnabled = onUpdateIsAmbientModeEnabled
                             )
                             4 -> AutomationTab(
                                 playbackSettings = playbackSettings,
@@ -1131,11 +1135,22 @@ private fun InterfaceTab(
 private fun OverlaysTab(
     playbackSettings: PlaybackSettings,
     onUpdateShowRemainingTime: (Boolean) -> Unit,
-    onUpdateShowBatteryClockOverlay: (Boolean) -> Unit
+    onUpdateShowBatteryClockOverlay: (Boolean) -> Unit,
+    onUpdateIsAmbientModeEnabled: (Boolean) -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SheetSectionLabel("Info Overlays")
+        SheetSectionLabel(stringResource(R.string.player_appearance))
         SheetCard {
+            SheetToggleRow(
+                icon = Icons.Default.WbIncandescent,
+                title = stringResource(R.string.ambient_mode),
+                subtitle = stringResource(R.string.ambient_mode_warning),
+                checked = playbackSettings.isAmbientModeEnabled,
+                onCheckedChange = onUpdateIsAmbientModeEnabled
+            )
+
+            SheetDivider()
+
             SheetToggleRow(
                 icon = Icons.Default.HourglassBottom,
                 title = "Show Remaining Time",

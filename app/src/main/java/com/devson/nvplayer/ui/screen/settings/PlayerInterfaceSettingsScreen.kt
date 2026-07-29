@@ -27,6 +27,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.res.stringResource
+import com.devson.nvplayer.R
 import com.devson.nvplayer.data.repository.FullScreenMode
 import com.devson.nvplayer.data.repository.OrientationMode
 import com.devson.nvplayer.data.repository.SoftButtonMode
@@ -206,9 +208,17 @@ fun PlayerInterfaceSettingsScreen(
                 )
             }
 
-            // Info Overlays Section
+            // Player Appearance Section
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                InterfaceSectionHeader("Info Overlays")
+                InterfaceSectionHeader(stringResource(R.string.player_appearance))
+                SettingToggleCard(
+                    icon = Icons.Default.WbIncandescent,
+                    title = stringResource(R.string.ambient_mode),
+                    subtitle = stringResource(R.string.ambient_mode_warning),
+                    checked = playbackSettings.isAmbientModeEnabled,
+                    onCheckedChange = { settingsViewModel.updateIsAmbientModeEnabled(it) }
+                )
+
                 SettingToggleCard(
                     icon = Icons.Default.HourglassBottom,
                     title = "Show Remaining Time",

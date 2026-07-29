@@ -64,6 +64,7 @@ Special thanks to [**Ritesh Pandey (@Riteshp2001)**](https://github.com/Riteshp2
 
 ---
 
+<!--
 ## Star History
 
 <a href="https://www.star-history.com/?repos=Devson1024%2Fnosved-player&type=date&legend=top-left">
@@ -72,4 +73,4 @@ Special thanks to [**Ritesh Pandey (@Riteshp2001)**](https://github.com/Riteshp2
    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Devson1024/nosved-player&type=date&legend=top-left" />
    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Devson1024/nosved-player&type=date&legend=top-left" />
  </picture>
-</a>
+</a> -->

@@ -668,6 +668,7 @@ fun AppNavigation(
                 onUpdateIsBottomLayoutEnabled = { settingsViewModel.updateIsBottomLayoutEnabled(it) },
                 onUpdateShowControlGradients = { settingsViewModel.updateShowControlGradients(it) },
                 onUpdateShowUpNextQueue = { settingsViewModel.updateShowUpNextQueue(it) },
+                onUpdateIsAmbientModeEnabled = { settingsViewModel.updateIsAmbientModeEnabled(it) },
                 onUpdateEnhanceMode = { playerVm.updateEnhanceMode(it) },
                 onUpdateEnhanceSaturation = { playerVm.updateEnhanceSaturation(it) },
                 onUpdateEnhanceContrast = { playerVm.updateEnhanceContrast(it) },

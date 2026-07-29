@@ -131,7 +131,8 @@ data class PlaybackSettings(
     val isBottomLayoutEnabled: Boolean = false,
     val showControlGradients: Boolean = true,
     val showUpNextQueue: Boolean = true,
-    val queueLayoutMode: LayoutMode = LayoutMode.LIST
+    val queueLayoutMode: LayoutMode = LayoutMode.LIST,
+    val isAmbientModeEnabled: Boolean = false
 )
 
 

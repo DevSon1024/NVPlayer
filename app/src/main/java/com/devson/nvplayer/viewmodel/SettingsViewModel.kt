@@ -217,7 +217,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 isBottomLayoutEnabled = false,
                 showControlGradients = true,
                 showUpNextQueue = true,
-                queueLayoutMode = LayoutMode.LIST
+                queueLayoutMode = LayoutMode.LIST,
+                isAmbientModeEnabled = false
             )
         )
 
@@ -591,6 +592,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun updateQueueLayoutMode(mode: LayoutMode) {
         viewModelScope.launch { settingsRepo.updateQueueLayoutMode(mode) }
+    }
+
+    fun updateIsAmbientModeEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.updateIsAmbientModeEnabled(enabled) }
     }
 
     override fun onCleared() {

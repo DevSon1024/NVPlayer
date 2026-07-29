@@ -189,6 +189,7 @@ fun PlayerScreen(
     onUpdateIsBottomLayoutEnabled: (Boolean) -> Unit = {},
     onUpdateShowControlGradients: (Boolean) -> Unit = {},
     onUpdateShowUpNextQueue: (Boolean) -> Unit = {},
+    onUpdateIsAmbientModeEnabled: (Boolean) -> Unit = {},
     networkSpeedBytesPerSec: Long = 0L,
     bufferDurationSeconds: Double = 0.0,
     isNetworkStream: Boolean = false,
@@ -988,6 +989,7 @@ fun PlayerScreen(
             onUpdateIsBottomLayoutEnabled = onUpdateIsBottomLayoutEnabled,
             onUpdateShowControlGradients = onUpdateShowControlGradients,
             onUpdateShowUpNextQueue = onUpdateShowUpNextQueue,
+            onUpdateIsAmbientModeEnabled = onUpdateIsAmbientModeEnabled,
             onDismiss = { showPlayerSettingsSideSheet = false }
         )
 

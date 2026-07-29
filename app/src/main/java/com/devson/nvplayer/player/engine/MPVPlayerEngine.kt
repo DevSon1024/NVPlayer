@@ -97,8 +97,8 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
             MPVLib.setOptionString("gpu-context", "android")
             MPVLib.setOptionString("force-window", "yes")
 
-            // Prioritize mediacodec (hardware decoding) and use fast profile
-            MPVLib.setOptionString("hwdec", "mediacodec")
+            // Prioritize hardware decoding with auto-safe fallback and use fast profile
+            MPVLib.setOptionString("hwdec", "auto-safe")
             MPVLib.setOptionString("profile", "fast")
 
             // Keep native player responsive and smooth
@@ -234,6 +234,8 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
         val uriString = uri.toString()
         Log.d("MPVPlayerEngine", "Loading media file: $uriString")
         try {
+            // Explicitly stop previous playback to release MediaCodec decoder lock
+            try { MPVLib.command("stop") } catch (_: Exception) {}
             MPVLib.command("loadfile", uriString)
             MPVLib.setPropertyBoolean("pause", false) // Auto-play the loaded media file
         } catch (e: Exception) {
@@ -545,11 +547,16 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
         Log.d("MPVPlayerEngine", "Releasing MPVPlayerEngine resources")
         activeInstance = null
         try {
-            // Instantly sever network connections and halt the demuxer
+            // Instantly stop playback, force hardware decoder release and detach surface
             MPVLib.command("stop")
+            MPVLib.setOptionString("hwdec", "no")
+            MPVLib.setPropertyString("hwdec", "no")
+            MPVLib.setPropertyString("vo", "null")
+            MPVLib.detachSurface()
 
             MPVLib.removeObserver(this)
             MPVLib.destroy()
+            isInitialized = false
         } catch (e: Exception) {
             Log.e("MPVPlayerEngine", "Failed to release MPVLib resources", e)
         }

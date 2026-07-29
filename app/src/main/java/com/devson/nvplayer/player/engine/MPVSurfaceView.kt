@@ -67,13 +67,12 @@ class MPVSurfaceView @JvmOverloads constructor(
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         Log.d("MPVSurfaceView", "Surface destroyed - detaching native surface from MPVLib")
         val surface = holder.surface
-        synchronized(MPVSurfaceView) { // Synchronize on companion object to serialize native calls
+        synchronized(MPVSurfaceView) {
             try {
                 if (getActiveSurface() === surface) {
                     setActiveSurface(null)
-                    
-                    // MUST BE SYNCHRONOUS. Do not run this inside a background thread.
-                    // The surface is invalidated by the system immediately when this method returns.
+                    // MUST BE SYNCHRONOUS. Do not defer or run on background thread.
+                    // The surface is invalidated by the system immediately when this returns.
                     MPVLib.setPropertyString("vo", "null")
                     MPVLib.setOptionString("force-window", "no")
                     MPVLib.detachSurface()

@@ -79,4 +79,9 @@
     <string name="history_clear_confirm_desc">This will permanently clear your entire playback history. This action cannot be undone.</string>
     <string name="history_clear_button">Clear</string>
     <string name="history_cancel_button">Cancel</string>
+
+    <!-- Player Appearance & Ambient Mode -->
+    <string name="player_appearance">Player Appearance</string>
+    <string name="ambient_mode">Ambient Mode</string>
+    <string name="ambient_mode_warning">Makes the player background glow. May increase battery usage and affect performance.</string>
 </resources>
