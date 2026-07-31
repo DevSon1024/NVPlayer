@@ -543,6 +543,98 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
         }
     }
 
+    override fun stepFrameForward() {
+        try {
+            Log.d("MPVPlayerEngine", "Stepping frame forward")
+            MPVLib.command("frame-step")
+        } catch (e: Exception) {
+            Log.e("MPVPlayerEngine", "Failed to step frame forward", e)
+        }
+    }
+
+    override fun stepFrameBackward() {
+        try {
+            Log.d("MPVPlayerEngine", "Stepping frame backward")
+            MPVLib.command("frame-back-step")
+        } catch (e: Exception) {
+            Log.e("MPVPlayerEngine", "Failed to step frame backward", e)
+        }
+    }
+
+    override fun setMute(isMuted: Boolean) {
+        try {
+            MPVLib.setPropertyBoolean("mute", isMuted)
+        } catch (e: Exception) {
+            Log.e("MPVPlayerEngine", "Failed to set mute state", e)
+        }
+    }
+
+    override fun isMuted(): Boolean {
+        return try {
+            MPVLib.getPropertyBoolean("mute") ?: false
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    override fun getEstimatedFrameCount(): Long {
+        try {
+            val count = MPVLib.getPropertyInt("estimated-frame-count")
+            if (count != null && count > 0) {
+                return count.toLong()
+            }
+            val fps = getFps()
+            val durSec = duration.value / 1000.0
+            if (fps > 0.0 && durSec > 0.0) {
+                return (durSec * fps).toLong()
+            }
+        } catch (e: Exception) {
+            Log.e("MPVPlayerEngine", "Failed to get estimated frame count", e)
+        }
+        return 0L
+    }
+
+    override fun getEstimatedFrameNumber(): Long {
+        try {
+            val num = MPVLib.getPropertyInt("estimated-frame-number")
+            if (num != null && num >= 0) {
+                return num.toLong()
+            }
+            val fps = getFps()
+            val posSec = currentPosition.value / 1000.0
+            if (fps > 0.0 && posSec >= 0.0) {
+                return (posSec * fps).toLong()
+            }
+        } catch (e: Exception) {
+            Log.e("MPVPlayerEngine", "Failed to get estimated frame number", e)
+        }
+        return 0L
+    }
+
+    private fun getFps(): Double {
+        try {
+            val fps = MPVLib.getPropertyDouble("container-fps")
+                ?: MPVLib.getPropertyDouble("fps")
+            if (fps != null && fps > 0.0) {
+                return fps
+            }
+        } catch (_: Exception) {}
+        return 24.0
+    }
+
+    override fun seekToFrame(targetFrame: Long) {
+        try {
+            val fps = getFps()
+            if (fps > 0.0) {
+                val targetTimeSec = targetFrame / fps
+                Log.d("MPVPlayerEngine", "Seeking to frame $targetFrame at time $targetTimeSec s (fps=$fps)")
+                MPVLib.command("seek", targetTimeSec.toString(), "absolute+exact")
+            }
+        } catch (e: Exception) {
+            Log.e("MPVPlayerEngine", "Failed to seek to frame $targetFrame", e)
+        }
+    }
+
     override fun release() {
         Log.d("MPVPlayerEngine", "Releasing MPVPlayerEngine resources")
         activeInstance = null

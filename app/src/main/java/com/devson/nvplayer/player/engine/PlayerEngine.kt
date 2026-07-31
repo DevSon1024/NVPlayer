@@ -46,5 +46,12 @@ interface PlayerEngine {
     fun setDecoder(mode: DecoderMode)
     fun setAspectMode(mode: AspectMode)
     fun setVideoTrackEnabled(enabled: Boolean)
+    fun stepFrameForward()
+    fun stepFrameBackward()
+    fun setMute(isMuted: Boolean)
+    fun isMuted(): Boolean
+    fun getEstimatedFrameCount(): Long
+    fun getEstimatedFrameNumber(): Long
+    fun seekToFrame(targetFrame: Long)
     fun release()
 }

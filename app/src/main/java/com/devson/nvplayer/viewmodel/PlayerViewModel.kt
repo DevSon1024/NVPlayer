@@ -14,6 +14,7 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -105,6 +106,19 @@ class PlayerViewModel(
 
     private val _isDynamicSpeedActive = MutableStateFlow(false)
     val isDynamicSpeedActive: StateFlow<Boolean> = _isDynamicSpeedActive.asStateFlow()
+
+    private val _isFrameCaptureMode = MutableStateFlow(false)
+    val isFrameCaptureMode: StateFlow<Boolean> = _isFrameCaptureMode.asStateFlow()
+
+    private val _currentFrame = MutableStateFlow(0L)
+    val currentFrame: StateFlow<Long> = _currentFrame.asStateFlow()
+
+    private val _totalFrames = MutableStateFlow(0L)
+    val totalFrames: StateFlow<Long> = _totalFrames.asStateFlow()
+
+    private var previousMuteState: Boolean = false
+    private var frameScrubJob: Job? = null
+    private var lastScrubTimeMs: Long = 0L
 
     fun setDynamicSpeedActive(active: Boolean) {
         _isDynamicSpeedActive.value = active
@@ -1095,6 +1109,53 @@ class PlayerViewModel(
                 Log.e("PlayerViewModel", "Failed to take video screenshot", e)
                 Toast.makeText(context, "Screenshot failed: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    fun enterFrameCaptureMode() {
+        playerEngine.pause()
+        previousMuteState = playerEngine.isMuted()
+        playerEngine.setMute(true)
+
+        val total = playerEngine.getEstimatedFrameCount()
+        val current = playerEngine.getEstimatedFrameNumber()
+        _totalFrames.value = total
+        _currentFrame.value = current
+        _isFrameCaptureMode.value = true
+    }
+
+    fun exitFrameCaptureMode() {
+        playerEngine.setMute(previousMuteState)
+        _isFrameCaptureMode.value = false
+    }
+
+    fun stepFrameForward() {
+        playerEngine.stepFrameForward()
+        _currentFrame.value = playerEngine.getEstimatedFrameNumber()
+    }
+
+    fun stepFrameBackward() {
+        playerEngine.stepFrameBackward()
+        _currentFrame.value = playerEngine.getEstimatedFrameNumber()
+    }
+
+    fun onFrameSliderScrubbing(targetFrame: Long) {
+        _currentFrame.value = targetFrame
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastScrubTimeMs >= 150L) {
+            lastScrubTimeMs = currentTime
+            frameScrubJob?.cancel()
+            frameScrubJob = viewModelScope.launch {
+                playerEngine.seekToFrame(targetFrame)
+            }
+        }
+    }
+
+    fun onFrameSliderReleased(targetFrame: Long) {
+        _currentFrame.value = targetFrame
+        frameScrubJob?.cancel()
+        frameScrubJob = viewModelScope.launch {
+            playerEngine.seekToFrame(targetFrame)
         }
     }
 

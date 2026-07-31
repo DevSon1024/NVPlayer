@@ -212,6 +212,13 @@ fun PlayerScreen(
     val activeViewModel = viewModel ?: resolvedViewModel
     val bufferedPosition by (activeViewModel?.bufferedPosition ?: kotlinx.coroutines.flow.MutableStateFlow(bufferedPosition)).collectAsStateWithLifecycle()
     val engineMediaTitle by (activeViewModel?.mediaTitle ?: kotlinx.coroutines.flow.MutableStateFlow("")).collectAsStateWithLifecycle()
+    val isFrameCaptureMode by (activeViewModel?.isFrameCaptureMode ?: kotlinx.coroutines.flow.MutableStateFlow(false)).collectAsStateWithLifecycle()
+    val currentFrame by (activeViewModel?.currentFrame ?: kotlinx.coroutines.flow.MutableStateFlow(0L)).collectAsStateWithLifecycle()
+    val totalFrames by (activeViewModel?.totalFrames ?: kotlinx.coroutines.flow.MutableStateFlow(0L)).collectAsStateWithLifecycle()
+
+    androidx.activity.compose.BackHandler(enabled = isFrameCaptureMode) {
+        activeViewModel?.exitFrameCaptureMode()
+    }
 
     var controlsVisible by remember { mutableStateOf(true) }
     var isLocked by remember { mutableStateOf(false) }
@@ -665,7 +672,7 @@ fun PlayerScreen(
 
             else -> {
                 if (!isInPipMode) {
-                    if (!isLocked) {
+                    if (!isLocked && !isFrameCaptureMode) {
                         GestureOverlay(
                             isPlaying = isPlaying,
                             currentPosition = currentPosition,
@@ -748,7 +755,7 @@ fun PlayerScreen(
 
                     // Unified Premium Controls Layer
                     AnimatedVisibility(
-                        visible = controlsVisible && !isLocked,
+                        visible = controlsVisible && !isLocked && !isFrameCaptureMode,
                         enter = fadeIn(),
                         exit = fadeOut()
                     ) {
@@ -825,10 +832,25 @@ fun PlayerScreen(
                                     onQueueVisibleChange(true)
                                 }
                              },
-                             onScreenshotClick = onTakeVideoScreenshot,
+                             onScreenshotClick = {
+                                activeViewModel?.enterFrameCaptureMode()
+                             },
                              ytdlQuality = playbackSettings.ytdlQuality,
                             onShowQuality = { showQualitySideSheet = true },
                             modifier = Modifier
+                        )
+                    }
+
+                    if (isFrameCaptureMode) {
+                        com.devson.nvplayer.ui.common.FrameCaptureOverlay(
+                            currentFrame = currentFrame,
+                            totalFrames = totalFrames,
+                            onStepBackward = { activeViewModel?.stepFrameBackward() },
+                            onStepForward = { activeViewModel?.stepFrameForward() },
+                            onSliderScrubbing = { activeViewModel?.onFrameSliderScrubbing(it) },
+                            onSliderReleased = { activeViewModel?.onFrameSliderReleased(it) },
+                            onCapture = { activeViewModel?.takeVideoScreenshot() },
+                            onExit = { activeViewModel?.exitFrameCaptureMode() }
                         )
                     }
                 }
