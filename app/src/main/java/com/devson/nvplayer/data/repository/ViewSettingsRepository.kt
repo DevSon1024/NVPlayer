@@ -9,6 +9,7 @@ import com.devson.nvplayer.domain.model.SortField
 import com.devson.nvplayer.domain.model.ViewMode
 import com.devson.nvplayer.domain.model.ViewSettings
 import com.devson.nvplayer.domain.model.ThumbnailMode
+import com.devson.nvplayer.domain.model.HomeSection
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,6 +45,9 @@ class ViewSettingsRepository private constructor(context: Context) {
             enableFabPreview = prefs.getBoolean("enable_fab_preview", true),
             scanFoldersList = prefs.getStringSet("scan_folders_list", emptySet()) ?: emptySet(),
             showHistoryCard = prefs.getBoolean("show_history_card", true),
+            isShortcutsVisible = prefs.getBoolean("is_shortcuts_visible", true),
+            isDetailsVisible = prefs.getBoolean("is_details_visible", true),
+            homeSectionOrder = parseHomeSectionOrder(prefs.getString("home_section_order", null)),
             showStorageTracker = prefs.getBoolean("show_storage_tracker", true),
             showLatestVideos = prefs.getBoolean("show_latest_videos", true),
             defaultScreen = try {
@@ -143,6 +147,9 @@ class ViewSettingsRepository private constructor(context: Context) {
             putString("view_mode", updated.viewMode.name)
             putString("thumbnail_mode", updated.thumbnailMode.name)
             putFloat("thumbnail_frame_position", updated.thumbnailFramePosition)
+            putBoolean("is_shortcuts_visible", updated.isShortcutsVisible)
+            putBoolean("is_details_visible", updated.isDetailsVisible)
+            putString("home_section_order", updated.homeSectionOrder.joinToString(",") { it.name })
             apply()
         }
     }
@@ -245,5 +252,24 @@ class ViewSettingsRepository private constructor(context: Context) {
 
     suspend fun updateThumbnailFramePosition(pos: Float) {
         updateSettings { it.copy(thumbnailFramePosition = pos) }
+    }
+
+    suspend fun updateIsShortcutsVisible(visible: Boolean) {
+        updateSettings { it.copy(isShortcutsVisible = visible) }
+    }
+
+    suspend fun updateIsDetailsVisible(visible: Boolean) {
+        updateSettings { it.copy(isDetailsVisible = visible) }
+    }
+
+    suspend fun updateHomeSectionOrder(order: List<HomeSection>) {
+        updateSettings { it.copy(homeSectionOrder = order) }
+    }
+
+    private fun parseHomeSectionOrder(raw: String?): List<HomeSection> {
+        if (raw.isNullOrBlank()) return listOf(HomeSection.SHORTCUTS, HomeSection.HISTORY, HomeSection.DETAILS)
+        val parsed = raw.split(',').mapNotNull { runCatching { HomeSection.valueOf(it) }.getOrNull() }
+        val missing = HomeSection.entries.filter { it !in parsed }
+        return parsed + missing
     }
 }

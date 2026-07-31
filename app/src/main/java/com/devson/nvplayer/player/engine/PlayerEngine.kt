@@ -53,5 +53,6 @@ interface PlayerEngine {
     fun getEstimatedFrameCount(): Long
     fun getEstimatedFrameNumber(): Long
     fun seekToFrame(targetFrame: Long)
+    fun getAmbientFrameSample(cacheFile: java.io.File): android.graphics.Bitmap?
     fun release()
 }

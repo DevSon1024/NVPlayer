@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.devson.nvplayer.domain.model.DefaultScreen
+import com.devson.nvplayer.domain.model.HomeSection
 import com.devson.nvplayer.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,7 +47,6 @@ fun CustomHomeSettingsScreen(
     var showDefaultScreenDialog by remember { mutableStateOf(false) }
     var showRestartDialog by remember { mutableStateOf(false) }
 
-    // Restarts the app by relaunching MainActivity from scratch via PendingIntent
     val restartApp: () -> Unit = {
         val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)!!
             .apply {
@@ -97,17 +97,48 @@ fun CustomHomeSettingsScreen(
         ) {
             Spacer(Modifier.height(4.dp))
 
-            // Home Cards Section
+            // Home Sections Visibility
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                CustomHomeHeader("Home Screen Cards")
+                CustomHomeHeader("Section Visibility")
+                SettingToggleCard(
+                    icon = Icons.Default.Widgets,
+                    title = "Show Shortcuts Section",
+                    subtitle = "Display Video Feed & Recycle Bin quick action cards",
+                    checked = viewSettings.isShortcutsVisible,
+                    onCheckedChange = { settingsViewModel.updateIsShortcutsVisible(it) }
+                )
+
                 SettingToggleCard(
                     icon = Icons.Default.History,
-                    title = "Show Watch History Card",
+                    title = "Show Watch History Section",
                     subtitle = "Display 'Continue Watching' row for recently played videos",
                     checked = viewSettings.showHistoryCard,
                     onCheckedChange = { settingsViewModel.updateShowHistoryCard(it) }
                 )
 
+                SettingToggleCard(
+                    icon = Icons.Default.Analytics,
+                    title = "Show Details Section",
+                    subtitle = "Display library statistics, total videos count & storage analyzer",
+                    checked = viewSettings.isDetailsVisible,
+                    onCheckedChange = { settingsViewModel.updateIsDetailsVisible(it) }
+                )
+            }
+
+            // Home Section Layout & Drag/Drop Reordering
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                CustomHomeHeader("Section Layout & Order")
+                ReorderableHomeSectionList(
+                    order = viewSettings.homeSectionOrder,
+                    onOrderChanged = { newOrder ->
+                        settingsViewModel.updateHomeSectionOrder(newOrder)
+                    }
+                )
+            }
+
+            // Additional Cards Section
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                CustomHomeHeader("Home Screen Cards")
                 SettingToggleCard(
                     icon = Icons.Default.VideoLibrary,
                     title = "Show Latest Videos Card",
@@ -238,6 +269,122 @@ fun CustomHomeSettingsScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun ReorderableHomeSectionList(
+    order: List<HomeSection>,
+    onOrderChanged: (List<HomeSection>) -> Unit
+) {
+    var sectionList by remember(order) { mutableStateOf(order) }
+
+    fun moveItem(fromIndex: Int, toIndex: Int) {
+        if (fromIndex in sectionList.indices && toIndex in sectionList.indices && fromIndex != toIndex) {
+            val newList = sectionList.toMutableList()
+            val moved = newList.removeAt(fromIndex)
+            newList.add(toIndex, moved)
+            sectionList = newList
+            onOrderChanged(newList)
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .border(
+                BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                ),
+                RoundedCornerShape(16.dp)
+            ),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            sectionList.forEachIndexed { index, section ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DragHandle,
+                            contentDescription = "Drag to reorder",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+
+                        Column {
+                            Text(
+                                text = section.displayName,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = section.subtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { moveItem(index, index - 1) },
+                            enabled = index > 0,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowUp,
+                                contentDescription = "Move Up",
+                                tint = if (index > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { moveItem(index, index + 1) },
+                            enabled = index < sectionList.lastIndex,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Move Down",
+                                tint = if (index < sectionList.lastIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            )
+                        }
+                    }
+                }
+
+                if (index < sectionList.lastIndex) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    )
+                }
+            }
+        }
     }
 }
 

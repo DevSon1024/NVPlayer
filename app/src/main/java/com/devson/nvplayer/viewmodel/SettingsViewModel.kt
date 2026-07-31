@@ -598,6 +598,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { settingsRepo.updateIsAmbientModeEnabled(enabled) }
     }
 
+    fun updateIsShortcutsVisible(visible: Boolean) {
+        viewModelScope.launch { viewSettingsRepo.updateIsShortcutsVisible(visible) }
+    }
+
+    fun updateIsDetailsVisible(visible: Boolean) {
+        viewModelScope.launch { viewSettingsRepo.updateIsDetailsVisible(visible) }
+    }
+
+    fun updateHomeSectionOrder(order: List<com.devson.nvplayer.domain.model.HomeSection>) {
+        viewModelScope.launch { viewSettingsRepo.updateHomeSectionOrder(order) }
+    }
+
     override fun onCleared() {
         super.onCleared()
         // RELEASE FIX: Unregister the SharedPreferences listener to break the strong reference
