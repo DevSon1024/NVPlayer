@@ -573,9 +573,9 @@ fun PlayerSettingsSideSheet(
             },
             optionLabel = {
                 when (it) {
-                    SoftButtonMode.AUTO_HIDE -> "Auto Hide Navigation Bar"
+                    SoftButtonMode.AUTO_HIDE -> "Auto-hide with controls"
                     SoftButtonMode.SHOW -> "Always Show Navigation Bar"
-                    SoftButtonMode.HIDE -> "Always Hide Navigation Bar"
+                    SoftButtonMode.HIDE -> "Always hide (Immersive mode)"
                 }
             }
         )

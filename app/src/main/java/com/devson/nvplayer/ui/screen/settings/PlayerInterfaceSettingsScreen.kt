@@ -394,9 +394,9 @@ fun PlayerInterfaceSettingsScreen(
                             Spacer(Modifier.width(16.dp))
                             Text(
                                 text = when (mode) {
-                                    SoftButtonMode.AUTO_HIDE -> "Auto Hide Navigation Bar"
+                                    SoftButtonMode.AUTO_HIDE -> "Auto-hide with controls"
                                     SoftButtonMode.SHOW -> "Always Show Navigation Bar"
-                                    SoftButtonMode.HIDE -> "Always Hide Navigation Bar"
+                                    SoftButtonMode.HIDE -> "Always hide (Immersive mode)"
                                 },
                                 style = MaterialTheme.typography.bodyLarge
                             )
