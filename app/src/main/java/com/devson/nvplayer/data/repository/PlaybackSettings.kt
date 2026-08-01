@@ -50,7 +50,7 @@ data class PlaybackSettings(
     val fastplaySpeed: Float = 2.0f,
     val orientationMode: OrientationMode = OrientationMode.SYSTEM_DEFAULT,
     val fullScreenMode: FullScreenMode = FullScreenMode.AUTO_SWITCH,
-    val softButtonMode: SoftButtonMode = SoftButtonMode.AUTO_HIDE,
+    val softButtonMode: SoftButtonMode = SoftButtonMode.HIDE,
     val showBatteryClockOverlay: Boolean = false,
     val pauseWhenObstructed: Boolean = true,
     val showRemainingTime: Boolean = false,

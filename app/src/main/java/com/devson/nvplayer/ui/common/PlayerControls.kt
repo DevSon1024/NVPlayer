@@ -287,7 +287,7 @@ fun PlayerControls(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (buttons.size <= 2) {
+                if (!isBottomLayoutEnabled || buttons.size <= 2) {
                     buttons.forEach { button ->
                         controlButton(button)
                     }
@@ -326,7 +326,7 @@ fun PlayerControls(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (buttons.size <= 2) {
+                if (!isBottomLayoutEnabled || buttons.size <= 2) {
                     buttons.forEach { button ->
                         controlButton(button)
                     }

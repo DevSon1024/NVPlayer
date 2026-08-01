@@ -155,11 +155,11 @@ class PlaybackSettingsRepository(context: Context) {
                 SoftButtonMode.valueOf(
                     prefs.getString(
                         "soft_button_mode",
-                        SoftButtonMode.AUTO_HIDE.name
-                    ) ?: SoftButtonMode.AUTO_HIDE.name
+                        SoftButtonMode.HIDE.name
+                    ) ?: SoftButtonMode.HIDE.name
                 )
             } catch (e: Exception) {
-                SoftButtonMode.AUTO_HIDE
+                SoftButtonMode.HIDE
             },
             showBatteryClockOverlay = prefs.getBoolean("show_battery_clock_overlay", false),
             pauseWhenObstructed = prefs.getBoolean("pause_when_obstructed", true),

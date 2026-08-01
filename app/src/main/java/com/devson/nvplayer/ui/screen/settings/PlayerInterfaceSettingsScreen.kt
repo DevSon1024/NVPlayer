@@ -49,6 +49,7 @@ fun PlayerInterfaceSettingsScreen(
     var showOrientationDialog by remember { mutableStateOf(false) }
     var showScalingDialog by remember { mutableStateOf(false) }
     var showSoftButtonDialog by remember { mutableStateOf(false) }
+    var showPlaybackControlPositionDialog by remember { mutableStateOf(false) }
     var showIconSizeDialog by remember { mutableStateOf(false) }
     var showSeekBarStyleDialog by remember { mutableStateOf(false) }
 
@@ -138,12 +139,11 @@ fun PlayerInterfaceSettingsScreen(
                     onClick = { showSoftButtonDialog = true }
                 )
 
-                SettingToggleCard(
+                SettingClickableCard(
                     icon = Icons.Default.PlayCircle,
-                    title = "Play/Pause Button Position",
-                    subtitle = "Move play/pause button to below Seekbar",
-                    checked = playbackSettings.isBottomLayoutEnabled,
-                    onCheckedChange = { settingsViewModel.updateIsBottomLayoutEnabled(it) }
+                    title = "Playback Control Position",
+                    subtitle = if (playbackSettings.isBottomLayoutEnabled) "Below Seekbar" else "Center",
+                    onClick = { showPlaybackControlPositionDialog = true }
                 )
 
                 SettingToggleCard(
@@ -497,6 +497,50 @@ fun PlayerInterfaceSettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showSoftButtonDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showPlaybackControlPositionDialog) {
+        val options = listOf(false, true)
+        AlertDialog(
+            onDismissRequest = { showPlaybackControlPositionDialog = false },
+            title = { Text("Playback Control Position") },
+            text = {
+                Column(Modifier.selectableGroup()) {
+                    options.forEach { option ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .selectable(
+                                    selected = (playbackSettings.isBottomLayoutEnabled == option),
+                                    onClick = {
+                                        settingsViewModel.updateIsBottomLayoutEnabled(option)
+                                        showPlaybackControlPositionDialog = false
+                                    },
+                                    role = Role.RadioButton
+                                )
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = (playbackSettings.isBottomLayoutEnabled == option),
+                                onClick = null
+                            )
+                            Spacer(Modifier.width(16.dp))
+                            Text(
+                                text = if (option) "Below Seekbar" else "Center",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPlaybackControlPositionDialog = false }) {
                     Text("Cancel")
                 }
             }

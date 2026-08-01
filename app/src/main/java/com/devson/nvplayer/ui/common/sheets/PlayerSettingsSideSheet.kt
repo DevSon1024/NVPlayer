@@ -110,6 +110,7 @@ fun PlayerSettingsSideSheet(
     var showOrientationDialog by remember { mutableStateOf(false) }
     var showScalingDialog by remember { mutableStateOf(false) }
     var showSoftButtonDialog by remember { mutableStateOf(false) }
+    var showPlaybackControlPositionDialog by remember { mutableStateOf(false) }
     var showIconSizeDialog by remember { mutableStateOf(false) }
     var showSeekBarStyleDialog by remember { mutableStateOf(false) }
 
@@ -337,6 +338,7 @@ fun PlayerSettingsSideSheet(
                                 onShowOrientationDialog = { showOrientationDialog = true },
                                 onShowScalingDialog = { showScalingDialog = true },
                                 onShowSoftButtonDialog = { showSoftButtonDialog = true },
+                                onShowPlaybackControlPositionDialog = { showPlaybackControlPositionDialog = true },
                                 onShowIconSizeDialog = { showIconSizeDialog = true },
                                 onShowSeekBarStyleDialog = { showSeekBarStyleDialog = true }
                             )
@@ -579,6 +581,28 @@ fun PlayerSettingsSideSheet(
                     SoftButtonMode.SHOW -> "Always Show Navigation Bar"
                     SoftButtonMode.HIDE -> "Always hide (Immersive mode)"
                 }
+            }
+        )
+    }
+
+    // Dialog: Playback Control Position
+    if (showPlaybackControlPositionDialog) {
+        val options = remember { listOf(false, true) }
+        PremiumSelectionDialog(
+            title = "Playback Control Position",
+            onDismiss = { showPlaybackControlPositionDialog = false },
+            onReset = {
+                onUpdateIsBottomLayoutEnabled(false)
+                showPlaybackControlPositionDialog = false
+            },
+            options = options,
+            selectedOption = playbackSettings.isBottomLayoutEnabled,
+            onOptionSelected = {
+                onUpdateIsBottomLayoutEnabled(it)
+                showPlaybackControlPositionDialog = false
+            },
+            optionLabel = { isBelow ->
+                if (isBelow) "Below Seekbar" else "Center"
             }
         )
     }
@@ -1000,6 +1024,7 @@ private fun InterfaceTab(
     onShowOrientationDialog: () -> Unit,
     onShowScalingDialog: () -> Unit,
     onShowSoftButtonDialog: () -> Unit,
+    onShowPlaybackControlPositionDialog: () -> Unit,
     onShowIconSizeDialog: () -> Unit,
     onShowSeekBarStyleDialog: () -> Unit
 ) {
@@ -1047,12 +1072,11 @@ private fun InterfaceTab(
 
             SheetDivider()
 
-            SheetToggleRow(
+            SheetRow(
                 icon = Icons.Default.PlayCircle,
-                title = "Play/Pause Button Position",
-                subtitle = "Move play/pause button to below Seekbar",
-                checked = playbackSettings.isBottomLayoutEnabled,
-                onCheckedChange = onUpdateIsBottomLayoutEnabled
+                title = "Playback Control Position",
+                subtitle = if (playbackSettings.isBottomLayoutEnabled) "Below Seekbar" else "Center",
+                onClick = onShowPlaybackControlPositionDialog
             )
 
             SheetDivider()

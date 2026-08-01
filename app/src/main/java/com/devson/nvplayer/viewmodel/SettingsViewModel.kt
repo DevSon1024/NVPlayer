@@ -189,7 +189,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 fastplaySpeed = 2.0f,
                 orientationMode = OrientationMode.SYSTEM_DEFAULT,
                 fullScreenMode = FullScreenMode.AUTO_SWITCH,
-                softButtonMode = SoftButtonMode.AUTO_HIDE,
+                softButtonMode = SoftButtonMode.HIDE,
                 showBatteryClockOverlay = false,
                 pauseWhenObstructed = true,
                 showRemainingTime = false,
