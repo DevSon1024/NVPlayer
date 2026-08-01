@@ -598,6 +598,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { settingsRepo.updateIsAmbientModeEnabled(enabled) }
     }
 
+    fun updateAmbientBlurStyle(style: com.devson.nvplayer.data.repository.AmbientBlurStyle) {
+        viewModelScope.launch { settingsRepo.updateAmbientBlurStyle(style) }
+    }
+
     fun updateIsShortcutsVisible(visible: Boolean) {
         viewModelScope.launch { viewSettingsRepo.updateIsShortcutsVisible(visible) }
     }

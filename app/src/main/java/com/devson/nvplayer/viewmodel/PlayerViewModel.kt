@@ -188,6 +188,16 @@ class PlayerViewModel(
                     }
                 }
         }
+
+        // Observe Ambient Mode setting and style changes and pass to native MPV engine
+        viewModelScope.launch {
+            playbackSettings
+                .map { Pair(it.isAmbientModeEnabled, it.ambientBlurStyle) }
+                .distinctUntilChanged()
+                .collect { (isEnabled, style) ->
+                    playerEngine.setAmbientMode(isEnabled, style)
+                }
+        }
         viewModelScope.launch {
             playbackState.collect { state ->
                 if (state is PlayerState.Playing) {
@@ -196,6 +206,10 @@ class PlayerViewModel(
                     }
                     if (!isExternalSubtitleLoaded) {
                         loadSavedExternalSubtitle()
+                    }
+                    val settings = playbackSettings.value
+                    if (settings.isAmbientModeEnabled) {
+                        playerEngine.setAmbientMode(true, settings.ambientBlurStyle)
                     }
                 } else if (state is PlayerState.Ended) {
                     clearPlaybackProgress()

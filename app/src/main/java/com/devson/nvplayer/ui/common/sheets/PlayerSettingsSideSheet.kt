@@ -90,6 +90,7 @@ fun PlayerSettingsSideSheet(
     onUpdateShowControlGradients: (Boolean) -> Unit = {},
     onUpdateShowUpNextQueue: (Boolean) -> Unit = {},
     onUpdateIsAmbientModeEnabled: (Boolean) -> Unit = {},
+    onUpdateAmbientBlurStyle: (com.devson.nvplayer.data.repository.AmbientBlurStyle) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
@@ -343,7 +344,8 @@ fun PlayerSettingsSideSheet(
                                 playbackSettings = playbackSettings,
                                 onUpdateShowRemainingTime = onUpdateShowRemainingTime,
                                 onUpdateShowBatteryClockOverlay = onUpdateShowBatteryClockOverlay,
-                                onUpdateIsAmbientModeEnabled = onUpdateIsAmbientModeEnabled
+                                onUpdateIsAmbientModeEnabled = onUpdateIsAmbientModeEnabled,
+                                onUpdateAmbientBlurStyle = onUpdateAmbientBlurStyle
                             )
                             4 -> AutomationTab(
                                 playbackSettings = playbackSettings,
@@ -1136,7 +1138,8 @@ private fun OverlaysTab(
     playbackSettings: PlaybackSettings,
     onUpdateShowRemainingTime: (Boolean) -> Unit,
     onUpdateShowBatteryClockOverlay: (Boolean) -> Unit,
-    onUpdateIsAmbientModeEnabled: (Boolean) -> Unit = {}
+    onUpdateIsAmbientModeEnabled: (Boolean) -> Unit = {},
+    onUpdateAmbientBlurStyle: (com.devson.nvplayer.data.repository.AmbientBlurStyle) -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SheetSectionLabel(stringResource(R.string.player_appearance))
@@ -1148,6 +1151,85 @@ private fun OverlaysTab(
                 checked = playbackSettings.isAmbientModeEnabled,
                 onCheckedChange = onUpdateIsAmbientModeEnabled
             )
+
+            if (playbackSettings.isAmbientModeEnabled) {
+                SheetDivider()
+                var expanded by remember { mutableStateOf(false) }
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { expanded = !expanded },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Ambient Blur Style",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = playbackSettings.ambientBlurStyle.displayName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Icon(
+                            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = "Expand Blur Options",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    AnimatedVisibility(visible = expanded) {
+                        Column(
+                            modifier = Modifier.padding(top = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            com.devson.nvplayer.data.repository.AmbientBlurStyle.values().forEach { style ->
+                                val isSelected = style == playbackSettings.ambientBlurStyle
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                                            else Color.Transparent
+                                        )
+                                        .selectable(
+                                            selected = isSelected,
+                                            onClick = { onUpdateAmbientBlurStyle(style) },
+                                            role = Role.RadioButton
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = { onUpdateAmbientBlurStyle(style) }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = style.displayName,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = style.description,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             SheetDivider()
 

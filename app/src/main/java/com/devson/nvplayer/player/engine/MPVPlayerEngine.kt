@@ -207,7 +207,10 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
             // Observe cache and network properties for streaming statistics
             MPVLib.observeProperty("cache-speed", MPVLib.MpvFormat.MPV_FORMAT_INT64)
             MPVLib.observeProperty("demux-cache-duration", MPVLib.MpvFormat.MPV_FORMAT_DOUBLE)
-            MPVLib.observeProperty("demuxer-cache-duration", MPVLib.MpvFormat.MPV_FORMAT_DOUBLE)
+            MPVLib.setOptionString("glsl-shaders", "")
+            MPVLib.setPropertyString("glsl-shaders", "")
+            MPVLib.setPropertyDouble("video-scale-x", 1.0)
+            MPVLib.setPropertyDouble("video-scale-y", 1.0)
 
             Log.d("MPVPlayerEngine", "MPVLib initialized successfully")
         } catch (e: Exception) {
@@ -234,10 +237,11 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
         val uriString = uri.toString()
         Log.d("MPVPlayerEngine", "Loading media file: $uriString")
         try {
-            // Explicitly stop previous playback to release MediaCodec decoder lock
             try { MPVLib.command("stop") } catch (_: Exception) {}
             MPVLib.command("loadfile", uriString)
             MPVLib.setPropertyBoolean("pause", false) // Auto-play the loaded media file
+            val settings = settingsRepo.playbackSettingsFlow.value
+            setAmbientMode(settings.isAmbientModeEnabled, settings.ambientBlurStyle)
         } catch (e: Exception) {
             Log.e("MPVPlayerEngine", "Failed to load file via MPVLib", e)
             _playbackState.value = PlayerState.Error("Load error: ${e.localizedMessage}")
@@ -635,6 +639,112 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
         }
     }
 
+    private var ambientShaderFile: File? = null
+    private var ambientShaderSeq = 0
+    private var lastCompiledShaderCode: String? = null
+    private var isAmbientEnabledInternal = false
+    private var ambientStyleInternal = com.devson.nvplayer.data.repository.AmbientBlurStyle.GLOW
+
+    override fun setAmbientMode(
+        isEnabled: Boolean,
+        style: com.devson.nvplayer.data.repository.AmbientBlurStyle
+    ) {
+        isAmbientEnabledInternal = isEnabled
+        ambientStyleInternal = style
+        if (!isEnabled) {
+            clearAmbientShader()
+        } else {
+            updateAmbientStretch()
+        }
+    }
+
+    fun updateAmbientStretch() {
+        if (!isAmbientEnabledInternal) {
+            clearAmbientShader()
+            return
+        }
+
+        try {
+            val metrics = context.resources.displayMetrics
+            val screenW = metrics.widthPixels.toDouble().coerceAtLeast(1.0)
+            val screenH = metrics.heightPixels.toDouble().coerceAtLeast(1.0)
+            val vidW = _videoWidth.value.toDouble().takeIf { it > 0 } ?: 1920.0
+            val vidH = _videoHeight.value.toDouble().takeIf { it > 0 } ?: 1080.0
+
+            val screenAr = screenW / screenH
+            val vidAr = vidW / vidH
+
+            val scaleX = if (screenAr > vidAr) screenAr / vidAr else 1.0
+            val scaleY = if (vidAr > screenAr) vidAr / screenAr else 1.0
+
+            MPVLib.setPropertyDouble("video-scale-x", scaleX)
+            MPVLib.setPropertyDouble("video-scale-y", scaleY)
+
+            val renderContext = com.devson.nvplayer.player.ambient.AmbientRenderContext(scaleX = scaleX, scaleY = scaleY)
+            val sharedConfig = com.devson.nvplayer.player.ambient.AmbientSharedShaderConfig(
+                bezelDepth = 0f,
+                vignetteStrength = 0.55f,
+                opacity = 1.0f
+            )
+
+            val spec: com.devson.nvplayer.player.ambient.AmbientShaderSpec = when (ambientStyleInternal.visualMode) {
+                com.devson.nvplayer.player.ambient.AmbientVisualMode.GLOW ->
+                    com.devson.nvplayer.player.ambient.AmbientGlowShaderSpec(
+                        context = renderContext,
+                        shared = sharedConfig,
+                        blurSamples = 18,
+                        maxRadius = 0.28f,
+                        glowIntensity = 1.45f,
+                        satBoost = 1.25f,
+                        warmth = 0.0f,
+                        fadeCurve = 1.7f
+                    )
+                com.devson.nvplayer.player.ambient.AmbientVisualMode.FRAME_EXTEND ->
+                    com.devson.nvplayer.player.ambient.AmbientFrameExtendShaderSpec(
+                        context = renderContext,
+                        shared = sharedConfig,
+                        sampleBudget = 24,
+                        extendStrength = 0.70f,
+                        detailProtection = 0.72f,
+                        glowMix = 0.12f,
+                        ditherNoise = 0.020f
+                    )
+            }
+
+            val shaderCode = com.devson.nvplayer.player.ambient.AmbientShaderBuilder.build(spec)
+            if (shaderCode == lastCompiledShaderCode && ambientShaderFile?.exists() == true) {
+                return
+            }
+            lastCompiledShaderCode = shaderCode
+
+            val newFile = File(context.cacheDir, "ambient_${++ambientShaderSeq}.glsl")
+            newFile.writeText(shaderCode)
+            ambientShaderFile?.delete()
+            ambientShaderFile = newFile
+
+            MPVLib.setOptionString("glsl-shaders", newFile.absolutePath)
+            MPVLib.setPropertyString("glsl-shaders", newFile.absolutePath)
+            Log.d("MPVPlayerEngine", "Applied True Ambient Mode shader (${ambientStyleInternal.displayName}) successfully")
+        } catch (e: Exception) {
+            Log.e("MPVPlayerEngine", "Failed to update ambient stretch", e)
+        }
+    }
+
+    private fun clearAmbientShader() {
+        try {
+            MPVLib.setPropertyDouble("video-scale-x", 1.0)
+            MPVLib.setPropertyDouble("video-scale-y", 1.0)
+            MPVLib.setOptionString("glsl-shaders", "")
+            MPVLib.setPropertyString("glsl-shaders", "")
+            ambientShaderFile?.delete()
+            ambientShaderFile = null
+            lastCompiledShaderCode = null
+            Log.d("MPVPlayerEngine", "Cleared ambient mode GLSL shaders successfully")
+        } catch (e: Exception) {
+            Log.e("MPVPlayerEngine", "Failed to clear ambient shader", e)
+        }
+    }
+
     override fun release() {
         Log.d("MPVPlayerEngine", "Releasing MPVPlayerEngine resources")
         activeInstance = null
@@ -661,8 +771,14 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
 
     override fun eventProperty(property: String, value: Long) {
         when (property) {
-            "video-params/w" -> _videoWidth.value = value
-            "video-params/h" -> _videoHeight.value = value
+            "video-params/w" -> {
+                _videoWidth.value = value
+                if (isAmbientEnabledInternal) updateAmbientStretch()
+            }
+            "video-params/h" -> {
+                _videoHeight.value = value
+                if (isAmbientEnabledInternal) updateAmbientStretch()
+            }
             "video-params/rotate" -> _videoRotation.value = value
             "cache-speed" -> _networkSpeedBytesPerSec.value = value
         }
@@ -736,6 +852,8 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
                 updateTracks()
                 updateChapters()
                 togglePerformanceOverlayFromConf()
+                val settings = settingsRepo.playbackSettingsFlow.value
+                setAmbientMode(settings.isAmbientModeEnabled, settings.ambientBlurStyle)
             }
             16, 21 -> {
                 Log.d("MPVPlayerEngine", "Tracks changed/restart event received ($eventId)")

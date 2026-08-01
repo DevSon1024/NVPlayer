@@ -375,7 +375,10 @@ class PlaybackSettingsRepository(context: Context) {
             } catch (e: Exception) {
                 LayoutMode.LIST
             },
-            isAmbientModeEnabled = prefs.getBoolean("is_ambient_mode_enabled", false)
+            isAmbientModeEnabled = prefs.getBoolean("is_ambient_mode_enabled", false),
+            ambientBlurStyle = AmbientBlurStyle.fromKey(
+                prefs.getString("ambient_blur_style", AmbientBlurStyle.GLOW.key) ?: AmbientBlurStyle.GLOW.key
+            )
         )
     }
 
@@ -481,6 +484,7 @@ class PlaybackSettingsRepository(context: Context) {
                 putBoolean("show_up_next_queue", updated.showUpNextQueue)
                 putString("queue_layout_mode", updated.queueLayoutMode.name)
                 putBoolean("is_ambient_mode_enabled", updated.isAmbientModeEnabled)
+                putString("ambient_blur_style", updated.ambientBlurStyle.key)
                 apply()
             }
         }
@@ -866,5 +870,9 @@ class PlaybackSettingsRepository(context: Context) {
 
     suspend fun updateIsAmbientModeEnabled(enabled: Boolean) {
         updatePlaybackSettings { it.copy(isAmbientModeEnabled = enabled) }
+    }
+
+    suspend fun updateAmbientBlurStyle(style: AmbientBlurStyle) {
+        updatePlaybackSettings { it.copy(ambientBlurStyle = style) }
     }
 }

@@ -53,5 +53,9 @@ interface PlayerEngine {
     fun getEstimatedFrameCount(): Long
     fun getEstimatedFrameNumber(): Long
     fun seekToFrame(targetFrame: Long)
+    fun setAmbientMode(
+        isEnabled: Boolean,
+        style: com.devson.nvplayer.data.repository.AmbientBlurStyle = com.devson.nvplayer.data.repository.AmbientBlurStyle.GLOW
+    )
     fun release()
 }

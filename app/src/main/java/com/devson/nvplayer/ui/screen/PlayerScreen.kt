@@ -190,6 +190,7 @@ fun PlayerScreen(
     onUpdateShowControlGradients: (Boolean) -> Unit = {},
     onUpdateShowUpNextQueue: (Boolean) -> Unit = {},
     onUpdateIsAmbientModeEnabled: (Boolean) -> Unit = {},
+    onUpdateAmbientBlurStyle: (com.devson.nvplayer.data.repository.AmbientBlurStyle) -> Unit = {},
     networkSpeedBytesPerSec: Long = 0L,
     bufferDurationSeconds: Double = 0.0,
     isNetworkStream: Boolean = false,
@@ -1013,6 +1014,7 @@ fun PlayerScreen(
             onUpdateShowControlGradients = onUpdateShowControlGradients,
             onUpdateShowUpNextQueue = onUpdateShowUpNextQueue,
             onUpdateIsAmbientModeEnabled = onUpdateIsAmbientModeEnabled,
+            onUpdateAmbientBlurStyle = onUpdateAmbientBlurStyle,
             onDismiss = { showPlayerSettingsSideSheet = false }
         )
 
