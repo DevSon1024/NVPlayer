@@ -92,6 +92,10 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
             Log.d("MPVPlayerEngine", "Initializing MPVLib instance")
             MPVLib.create(context.applicationContext)
 
+            // Configure MPV config directory
+            MPVLib.setOptionString("config-dir", context.filesDir.path)
+            MPVLib.setOptionString("config", "yes")
+
             // Configure standard MPV playback options for modern android
             MPVLib.setOptionString("vo", "gpu")
             MPVLib.setOptionString("gpu-context", "android")
@@ -166,9 +170,13 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
                                 val key = trimmed
                                 Log.d("MPVPlayerEngine", "Applying custom mpv flag option from mpv.conf: $key")
                                 try {
-                                    MPVLib.setOptionString(key, "")
+                                    MPVLib.setOptionString(key, "yes")
                                 } catch (e: Exception) {
-                                    Log.e("MPVPlayerEngine", "Failed to set custom flag option $key", e)
+                                    try {
+                                        MPVLib.setOptionString(key, "")
+                                    } catch (ex: Exception) {
+                                        Log.e("MPVPlayerEngine", "Failed to set custom flag option $key", ex)
+                                    }
                                 }
                             }
                         }
@@ -194,6 +202,8 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
             MPVLib.observeProperty("video-params/w", MPVLib.MpvFormat.MPV_FORMAT_INT64)
             MPVLib.observeProperty("video-params/h", MPVLib.MpvFormat.MPV_FORMAT_INT64)
             MPVLib.observeProperty("video-params/rotate", MPVLib.MpvFormat.MPV_FORMAT_INT64)
+            MPVLib.observeProperty("osd-width", MPVLib.MpvFormat.MPV_FORMAT_INT64)
+            MPVLib.observeProperty("osd-height", MPVLib.MpvFormat.MPV_FORMAT_INT64)
 
             // Observe subtitle text changes
             MPVLib.observeProperty("sub-text", MPVLib.MpvFormat.MPV_FORMAT_STRING)
@@ -665,13 +675,31 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
         }
 
         try {
-            val metrics = context.resources.displayMetrics
-            val screenW = metrics.widthPixels.toDouble().coerceAtLeast(1.0)
-            val screenH = metrics.heightPixels.toDouble().coerceAtLeast(1.0)
-            val vidW = _videoWidth.value.toDouble().takeIf { it > 0 } ?: 1920.0
-            val vidH = _videoHeight.value.toDouble().takeIf { it > 0 } ?: 1080.0
+            var osdW = try { MPVLib.getPropertyInt("osd-width") ?: 0 } catch (e: Exception) { 0 }
+            var osdH = try { MPVLib.getPropertyInt("osd-height") ?: 0 } catch (e: Exception) { 0 }
+            var vidW = _videoWidth.value.toDouble()
+            var vidH = _videoHeight.value.toDouble()
 
-            val screenAr = screenW / screenH
+            // Fallback to display metrics if OSD dimensions are not yet reported by MPVLib
+            if (osdW <= 0 || osdH <= 0) {
+                val metrics = context.resources.displayMetrics
+                osdW = metrics.widthPixels.coerceAtLeast(1)
+                osdH = metrics.heightPixels.coerceAtLeast(1)
+            }
+
+            // Do not compute scale distortion if video or viewport dimensions are uninitialized
+            if (osdW <= 0 || osdH <= 0 || vidW <= 0.0 || vidH <= 0.0) {
+                return
+            }
+
+            val rot = _videoRotation.value
+            if (rot == 90L || rot == 270L) {
+                val tmp = vidW
+                vidW = vidH
+                vidH = tmp
+            }
+
+            val screenAr = osdW.toDouble() / osdH.toDouble()
             val vidAr = vidW / vidH
 
             val scaleX = if (screenAr > vidAr) screenAr / vidAr else 1.0
@@ -724,7 +752,7 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
 
             MPVLib.setOptionString("glsl-shaders", newFile.absolutePath)
             MPVLib.setPropertyString("glsl-shaders", newFile.absolutePath)
-            Log.d("MPVPlayerEngine", "Applied True Ambient Mode shader (${ambientStyleInternal.displayName}) successfully")
+            Log.d("MPVPlayerEngine", "Applied True Ambient Mode shader (${ambientStyleInternal.displayName}) successfully (scaleX=$scaleX, scaleY=$scaleY)")
         } catch (e: Exception) {
             Log.e("MPVPlayerEngine", "Failed to update ambient stretch", e)
         }
@@ -777,6 +805,9 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
             }
             "video-params/h" -> {
                 _videoHeight.value = value
+                if (isAmbientEnabledInternal) updateAmbientStretch()
+            }
+            "osd-width", "osd-height" -> {
                 if (isAmbientEnabledInternal) updateAmbientStretch()
             }
             "video-params/rotate" -> _videoRotation.value = value
@@ -895,12 +926,16 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
                     } else {
                         val key = trimmed
                         try {
-                            MPVLib.setPropertyString(key, "")
+                            MPVLib.setPropertyString(key, "yes")
                         } catch (e: Exception) {
                             try {
-                                MPVLib.setOptionString(key, "")
+                                MPVLib.setPropertyString(key, "")
                             } catch (ex: Exception) {
-                                Log.e("MPVPlayerEngine", "Failed to dynamically set flag: $key", ex)
+                                try {
+                                    MPVLib.setOptionString(key, "yes")
+                                } catch (ex2: Exception) {
+                                    Log.e("MPVPlayerEngine", "Failed to dynamically set flag: $key", ex2)
+                                }
                             }
                         }
                     }
