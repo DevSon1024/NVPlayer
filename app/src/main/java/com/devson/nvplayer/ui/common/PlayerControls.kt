@@ -1,6 +1,7 @@
 package com.devson.nvplayer.ui.common
 
 import android.app.Activity
+import com.devson.nvplayer.ui.common.components.CustomSeekbar
 import android.content.Context
 import com.devson.nvplayer.util.findActivity
 import android.content.pm.ActivityInfo
@@ -736,151 +737,34 @@ fun PlayerControls(
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            // Premium Theme Slider Seekbar
-            Slider(
-                value = safeSliderPos,
-                onValueChange = { newVal ->
-                    draggingJob?.cancel()
-                    onDraggingChanged(true)
-                    sliderPosition = newVal
-                    val now = System.currentTimeMillis()
-                    if (now - lastSeekTime > 150L) {
-                        lastSeekTime = now
-                        onSeek(newVal.toLong(), false)
-                    }
-                },
-                onValueChangeFinished = {
-                    onSeek(sliderPosition.toLong(), true)
-                    draggingJob = scope.launch {
-                        delay(800) // Provides ExoPlayer/MPV debounce buffering window
-                        onDraggingChanged(false)
-                    }
-                },
-                valueRange = 0f..safeDuration,
-                modifier = Modifier.fillMaxWidth().height(24.dp),
-                colors = SliderDefaults.colors(
-                    thumbColor = themePrimary,
-                    
-                    activeTrackColor = themePrimary,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                ),
-                thumb = { _ ->
-                    Box(
-                        modifier = Modifier
-                            .size(if (isDragging) 16.dp else 12.dp)
-                            .clip(CircleShape)
-                            .background(themePrimary)
-                    )
-                },
-                track = { sliderState ->
-                    val rawFraction = ((sliderState.value - 0f) / safeDuration)
-                    val safeFraction = if (rawFraction.isNaN()) 0f else rawFraction.coerceIn(0f, 1f)
-                    val bufferFraction = if (safeDuration > 0f) (bufferedPosition.toFloat() / safeDuration).coerceIn(0f, 1f) else 0f
-                    val inactiveColor = Color.White.copy(alpha = 0.15f)
-                    val bufferedColor = themePrimary.copy(alpha = 0.45f)
-                    
-                    when (seekBarStyle) {
-                        "wavy" -> {
-                            val phaseShift = phaseShiftState.floatValue
-
-                            Canvas(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(24.dp)
-                            ) {
-                                val width = size.width
-                                val height = size.height
-                                val centerY = height / 2
-                                val activeWidth = width * safeFraction
-                                val bufferedWidth = width * bufferFraction
-                                
-                                val amplitude = 4.dp.toPx()
-                                val wavelength = 20.dp.toPx()
-                                
-                                // 1. Draw inactive flat track (only from activeProgress to end of canvas)
-                                if (activeWidth < width) {
-                                    drawLine(
-                                        color = inactiveColor,
-                                        start = Offset(activeWidth, centerY),
-                                        end = Offset(width, centerY),
-                                        strokeWidth = 4.dp.toPx(),
-                                        cap = StrokeCap.Round
-                                    )
-                                }
-                                
-                                // 2. Draw buffered flat track (only for network streams from activeProgress to bufferedProgress)
-                                if (isNetworkStream && bufferedWidth > activeWidth) {
-                                    drawLine(
-                                        color = bufferedColor,
-                                        start = Offset(activeWidth, centerY),
-                                        end = Offset(bufferedWidth, centerY),
-                                        strokeWidth = 4.dp.toPx(),
-                                        cap = StrokeCap.Round
-                                    )
-                                }
-                                
-                                // 3. Draw active wavy track (clip to activeProgress to prevent drawing past thumb)
-                                if (activeWidth > 0) {
-                                    val activePath = Path().apply {
-                                        moveTo(0f, centerY)
-                                        var x = 0f
-                                        val endX = activeWidth + wavelength
-                                        while (x <= endX) {
-                                            val y = centerY + amplitude * sin((2 * Math.PI * x / wavelength).toFloat() - phaseShift)
-                                            lineTo(x, y)
-                                            x += 2f
-                                        }
-                                    }
-                                    clipRect(right = activeWidth) {
-                                        drawPath(
-                                            path = activePath,
-                                            color = themePrimary,
-                                            style = Stroke(
-                                                width = 3.dp.toPx(),
-                                                cap = StrokeCap.Round
-                                            )
-                                        )
-                                    }
-                                }
-                            }
+            // mpvRx Custom Seekbar (Standard, Thick, Slim, Wavy)
+            CustomSeekbar(
+                position = safeSliderPos,
+                duration = safeDuration,
+                onSeek = { targetPos, isFinished ->
+                    sliderPosition = targetPos
+                    if (isFinished) {
+                        onSeek(targetPos.toLong(), true)
+                        draggingJob = scope.launch {
+                            delay(800)
+                            onDraggingChanged(false)
                         }
-                        "thick" -> {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().height(20.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(inactiveColor)
-                                ) {
-                                    // Buffered Layer
-                                    if (isNetworkStream && bufferFraction > 0f) {
-                                        Box(modifier = Modifier.fillMaxWidth(bufferFraction.coerceIn(0f, 1f)).height(8.dp).background(bufferedColor))
-                                    }
-                                    // Active Layer
-                                    Box(modifier = Modifier.fillMaxWidth(safeFraction.coerceIn(0f, 1f)).height(8.dp).background(themePrimary))
-                                }
-                            }
-                        }
-                        else -> {
-                            // Standard/Line Style
-                            Box(
-                                modifier = Modifier.fillMaxWidth().height(20.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(inactiveColor)
-                                ) {
-                                    // Buffered Layer
-                                    if (isNetworkStream && bufferFraction > 0f) {
-                                        Box(modifier = Modifier.fillMaxWidth(bufferFraction.coerceIn(0f, 1f)).height(4.dp).background(bufferedColor))
-                                    }
-                                    // Active Layer
-                                    Box(modifier = Modifier.fillMaxWidth(safeFraction.coerceIn(0f, 1f)).height(4.dp).background(themePrimary))
-                                }
-                            }
+                    } else {
+                        draggingJob?.cancel()
+                        val now = System.currentTimeMillis()
+                        if (now - lastSeekTime > 120L) {
+                            lastSeekTime = now
+                            onSeek(targetPos.toLong(), false)
                         }
                     }
-                }
+                },
+                onDraggingChanged = { isDragging ->
+                    onDraggingChanged(isDragging)
+                },
+                seekbarStyle = seekBarStyle,
+                isPaused = !isPlaying,
+                bufferedDuration = if (isNetworkStream && bufferedPosition > currentPosition) (bufferedPosition - currentPosition).toFloat() else 0f,
+                modifier = Modifier.fillMaxWidth().height(48.dp)
             )
 
             Spacer(modifier = Modifier.height(8.dp))

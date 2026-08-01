@@ -629,7 +629,7 @@ fun PlayerSettingsSideSheet(
 
     // Dialog: Seekbar style
     if (showSeekBarStyleDialog) {
-        val styles = remember { listOf("standard", "wavy", "thick") }
+        val styles = remember { listOf("standard", "thick", "slim", "wavy") }
         PremiumSelectionDialog(
             title = "Seekbar Style",
             onDismiss = { showSeekBarStyleDialog = false },
@@ -645,8 +645,9 @@ fun PlayerSettingsSideSheet(
             },
             optionLabel = {
                 when (it) {
-                    "wavy" -> "Wavy"
+                    "wavy" -> "Wavy (Curve)"
                     "thick" -> "Thick"
+                    "slim" -> "Slim"
                     else -> "Standard"
                 }
             }

@@ -592,7 +592,7 @@ fun PlayerInterfaceSettingsScreen(
     }
 
     if (showSeekBarStyleDialog) {
-        val styles = listOf("standard", "wavy", "thick")
+        val styles = listOf("standard", "thick", "slim", "wavy")
         AlertDialog(
             onDismissRequest = { showSeekBarStyleDialog = false },
             title = { Text("Seekbar Style") },
@@ -621,8 +621,9 @@ fun PlayerInterfaceSettingsScreen(
                             Spacer(Modifier.width(16.dp))
                             Text(
                                 text = when (style) {
-                                    "wavy" -> "Wavy"
+                                    "wavy" -> "Wavy (Curve)"
                                     "thick" -> "Thick"
+                                    "slim" -> "Slim"
                                     else -> "Standard"
                                 },
                                 style = MaterialTheme.typography.bodyLarge
