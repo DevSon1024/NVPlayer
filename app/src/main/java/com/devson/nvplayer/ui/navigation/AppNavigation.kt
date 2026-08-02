@@ -419,7 +419,8 @@ fun AppNavigation(
                 onBack = safePopBackStack,
                 onNavigateToMilliSeconds = { navController.navigate("tools_milliseconds") { launchSingleTop = true } },
                 onNavigateToVideoEditor = {},
-                onNavigateToMediaStoreFinder = { navController.navigate("tools_mediastore_finder") { launchSingleTop = true } }
+                onNavigateToMediaStoreFinder = { navController.navigate("tools_mediastore_finder") { launchSingleTop = true } },
+                onNavigateToFrameExtractor = { navController.navigate("tools_frame_extractor") { launchSingleTop = true } }
             )
         }
 
@@ -431,6 +432,12 @@ fun AppNavigation(
 
         composable("tools_mediastore_finder") {
             MediaStoreFinderScreen(
+                onBack = safePopBackStack
+            )
+        }
+
+        composable("tools_frame_extractor") {
+            com.devson.nvplayer.ui.screen.tools.FrameExtractionScreen(
                 onBack = safePopBackStack
             )
         }

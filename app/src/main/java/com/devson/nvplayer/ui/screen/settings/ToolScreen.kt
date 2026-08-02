@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.Movie
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,7 +21,8 @@ fun ToolScreen(
     onBack: () -> Unit,
     onNavigateToMilliSeconds: () -> Unit,
     onNavigateToVideoEditor: () -> Unit,
-    onNavigateToMediaStoreFinder: () -> Unit
+    onNavigateToMediaStoreFinder: () -> Unit,
+    onNavigateToFrameExtractor: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -47,6 +49,12 @@ fun ToolScreen(
                 ),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            ToolHubCard(
+                icon = Icons.Default.Movie,
+                title = "Batch Frame Extractor",
+                description = "Extract image frames sequentially from video segments directly into your gallery.",
+                onClick = onNavigateToFrameExtractor
+            )
             ToolHubCard(
                 icon = Icons.Default.AccessTime,
                 title = "Timestamp Tools",
