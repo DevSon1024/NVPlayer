@@ -199,6 +199,9 @@ class FrameExtractionService : Service() {
         return START_NOT_STICKY
     }
 
+    @Volatile
+    private var isCancelled = false
+
     private fun startExtractionJob(
         videoUri: Uri,
         rawVideoName: String,
@@ -208,6 +211,7 @@ class FrameExtractionService : Service() {
         format: FrameFormat,
         quality: Int
     ) {
+        isCancelled = false
         extractionJob?.cancel()
 
         val sanitizedDisplayName = resolveVideoDisplayName(this, videoUri)
@@ -233,6 +237,7 @@ class FrameExtractionService : Service() {
 
             val retriever = MediaMetadataRetriever()
             var successCount = 0
+            var previousBitmap: Bitmap? = null
 
             try {
                 retriever.setDataSource(this@FrameExtractionService, videoUri)
@@ -255,36 +260,56 @@ class FrameExtractionService : Service() {
                 var currentMs = clampedStartMs
                 var frameIndex = 1
 
-                while (currentMs <= clampedEndMs && coroutineContext.isActive) {
+                while (currentMs <= clampedEndMs && coroutineContext.isActive && !isCancelled) {
                     val timeUs = currentMs * 1000L
+
+                    // Use OPTION_CLOSEST first for exact timestamp decoding instead of keyframe OPTION_CLOSEST_SYNC
                     val bitmap: Bitmap? = try {
-                        retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                            ?: retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST)
+                        retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST)
+                            ?: retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                     } catch (e: Exception) {
                         null
                     }
 
+                    if (!coroutineContext.isActive || isCancelled) {
+                        bitmap?.recycle()
+                        break
+                    }
+
                     if (bitmap != null) {
-                        val fileName = "${sanitizedDisplayName}_frame_$frameIndex.${format.extension}"
-                        val saved = saveFrameToStorage(
-                            context = this@FrameExtractionService,
-                            bitmap = bitmap,
-                            folderName = sanitizedDisplayName,
-                            fileName = fileName,
-                            format = format,
-                            quality = quality
-                        )
+                        // Check if bitmap pixel content is identical to previous frame
+                        val isDuplicate = previousBitmap != null && try { bitmap.sameAs(previousBitmap) } catch (_: Exception) { false }
 
-                        // Immediately recycle bitmap out of memory to prevent OOM
-                        bitmap.recycle()
+                        if (!isDuplicate) {
+                            val fileName = "${sanitizedDisplayName}_frame_$frameIndex.${format.extension}"
+                            val saved = saveFrameToStorage(
+                                context = this@FrameExtractionService,
+                                bitmap = bitmap,
+                                folderName = sanitizedDisplayName,
+                                fileName = fileName,
+                                format = format,
+                                quality = quality
+                            )
 
-                        if (saved) {
-                            successCount++
+                            if (saved) {
+                                successCount++
+                                frameIndex++
+
+                                try {
+                                    previousBitmap?.recycle()
+                                    previousBitmap = bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, false)
+                                } catch (_: Exception) {
+                                    previousBitmap = null
+                                }
+                            }
                         }
+
+                        // Immediately recycle frame bitmap
+                        bitmap.recycle()
                     }
 
                     val progressRatio = ((currentMs - clampedStartMs).toFloat() / durationSelectedMs.toFloat()).coerceIn(0f, 1f)
-                    val count = frameIndex
+                    val count = frameIndex - 1
 
                     val statusMsg = "Extracted $count of $totalFrames frames"
                     _uiState.update {
@@ -295,17 +320,19 @@ class FrameExtractionService : Service() {
                         )
                     }
 
-                    val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    notificationManager.notify(
-                        NOTIFICATION_ID,
-                        buildNotification("Extracting $sanitizedDisplayName: $count/$totalFrames", (progressRatio * 100).toInt(), 100, true)
-                    )
+                    if (coroutineContext.isActive && !isCancelled) {
+                        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        notificationManager.notify(
+                            NOTIFICATION_ID,
+                            buildNotification("Extracting $sanitizedDisplayName: $count/$totalFrames", (progressRatio * 100).toInt(), 100, true)
+                        )
+                    }
 
-                    frameIndex++
                     currentMs += stepMs
+                    yield()
                 }
 
-                if (coroutineContext.isActive) {
+                if (coroutineContext.isActive && !isCancelled) {
                     val relativePath = "Pictures/NosvedPlayer/$sanitizedDisplayName"
                     _uiState.update {
                         it.copy(
@@ -324,30 +351,41 @@ class FrameExtractionService : Service() {
                     )
                 }
             } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isExtracting = false,
-                        error = e.localizedMessage ?: "Extraction failed.",
-                        statusMessage = "Extraction failed"
+                if (!isCancelled) {
+                    _uiState.update {
+                        it.copy(
+                            isExtracting = false,
+                            error = e.localizedMessage ?: "Extraction failed.",
+                            statusMessage = "Extraction failed"
+                        )
+                    }
+                    val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    notificationManager.notify(
+                        NOTIFICATION_ID,
+                        buildCompletionNotification("Extraction Failed", e.localizedMessage ?: "Error during extraction")
                     )
                 }
-                val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                notificationManager.notify(
-                    NOTIFICATION_ID,
-                    buildCompletionNotification("Extraction Failed", e.localizedMessage ?: "Error during extraction")
-                )
             } finally {
                 try {
+                    previousBitmap?.recycle()
+                } catch (_: Exception) {}
+                try {
                     retriever.release()
-                } catch (ignored: Exception) {
+                } catch (_: Exception) {}
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
                 }
-                stopForeground(STOP_FOREGROUND_DETACH)
                 stopSelf()
             }
         }
     }
 
     private fun stopExtractionJob(reason: String) {
+        isCancelled = true
         extractionJob?.cancel()
         _uiState.update {
             it.copy(
@@ -356,7 +394,14 @@ class FrameExtractionService : Service() {
                 progress = 0f
             )
         }
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancel(NOTIFICATION_ID)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
         stopSelf()
     }
 
