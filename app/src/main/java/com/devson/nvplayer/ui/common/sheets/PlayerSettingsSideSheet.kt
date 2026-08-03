@@ -52,6 +52,7 @@ import com.devson.nvplayer.data.repository.SoftButtonMode
 import com.devson.nvplayer.data.repository.MultiFingerAction
 import com.devson.nvplayer.player.model.AspectMode
 import androidx.compose.foundation.BorderStroke
+import com.devson.nvplayer.domain.model.Video
 import com.devson.nvplayer.util.repeatingClickable
 import com.devson.nvplayer.util.roundToTwoDecimals
 import java.util.Locale
@@ -65,6 +66,7 @@ fun PlayerSettingsSideSheet(
     visible: Boolean,
     currentSpeed: Float,
     playbackSettings: PlaybackSettings,
+    currentVideo: Video? = null,
     onSpeedSelected: (Float) -> Unit,
     onUpdateDoubleTapAction: (DoubleTapAction) -> Unit = {},
     onUpdateDoubleTapSeekDuration: (Long) -> Unit = {},
@@ -265,7 +267,8 @@ fun PlayerSettingsSideSheet(
                             Icons.Rounded.TouchApp,
                             Icons.Rounded.Tune,
                             Icons.Rounded.Layers,
-                            Icons.Rounded.AutoMode
+                            Icons.Rounded.AutoMode,
+                            Icons.Rounded.Info
                         )
                         tabs.forEachIndexed { index, icon ->
                             val isSelected = activeTab == index
@@ -353,6 +356,9 @@ fun PlayerSettingsSideSheet(
                                 playbackSettings = playbackSettings,
                                 onUpdatePauseWhenObstructed = onUpdatePauseWhenObstructed,
                                 onUpdateKeepAwakeAlways = onUpdateKeepAwakeAlways
+                            )
+                            5 -> InformationTab(
+                                video = currentVideo
                             )
                         }
                         Spacer(Modifier.height(16.dp))
@@ -1305,6 +1311,38 @@ private fun AutomationTab(
                 checked = playbackSettings.keepAwakeAlways,
                 onCheckedChange = onUpdateKeepAwakeAlways
             )
+        }
+    }
+}
+
+@Composable
+private fun InformationTab(
+    video: Video?
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        SheetSectionLabel("Media Information")
+        if (video != null) {
+            SingleVideoInformationContent(
+                video = video,
+                modifier = Modifier.fillMaxWidth(),
+                isScrollable = false
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No media information available",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

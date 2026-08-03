@@ -36,30 +36,7 @@ fun InformationBottomSheet(
     selectedVideos: Set<Video>,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
-    var fullMediaInfoText by remember { mutableStateOf<String?>(null) }
-    var isLoadingInfo by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    LaunchedEffect(selectedVideos) {
-        if (selectedVideos.size == 1) {
-            val video = selectedVideos.first()
-            isLoadingInfo = true
-            val uri = runCatching { Uri.parse(video.uri) }.getOrNull()
-            if (uri != null) {
-                MediaInfoOps.generateTextOutput(context, uri, video.title)
-                    .onSuccess {
-                        fullMediaInfoText = it
-                        isLoadingInfo = false
-                    }
-                    .onFailure {
-                        isLoadingInfo = false
-                    }
-            } else {
-                isLoadingInfo = false
-            }
-        }
-    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -96,278 +73,11 @@ fun InformationBottomSheet(
             Spacer(modifier = Modifier.height(8.dp))
 
             if (selectedVideos.size == 1) {
-                val video = selectedVideos.first()
-                val parsed = remember(video.title, video.duration) { MediaInfoParser.parse(video.title, video.duration) }
-
-                // Premium visual Title Card
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = parsed.title.ifBlank { video.title.substringBeforeLast(".") },
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            val typeLabel = when (parsed.type) {
-                                "tv" -> "TV Show"
-                                "movie" -> "Movie"
-                                else -> parsed.type
-                            }
-                            SuggestionChip(
-                                onClick = {},
-                                label = { Text(typeLabel) },
-                                colors = SuggestionChipDefaults.suggestionChipColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                                )
-                            )
-                            if (parsed.year != null) {
-                                SuggestionChip(
-                                    onClick = {},
-                                    label = { Text(parsed.year) }
-                                )
-                            }
-                            if (parsed.season != null && parsed.episode != null) {
-                                SuggestionChip(
-                                    onClick = {},
-                                    label = { Text("S${parsed.season}E${parsed.episode}") }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Sleek custom pill segment selectors (Overview, Video, Audio, Subtitles)
-                var selectedTab by remember { mutableStateOf(0) }
-                val tabs = listOf("Overview", "Video", "Audio", "Subtitles")
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    tabs.forEachIndexed { index, title ->
-                        val isSelected = selectedTab == index
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                )
-                                .clickable { selectedTab = index }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                        else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-
-                if (isLoadingInfo) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().height(200.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Analyzing media file...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                } else if (fullMediaInfoText != null) {
-                    val sections = remember(fullMediaInfoText) { parseMediaInfoText(fullMediaInfoText!!) }
-                    
-                    val generalSections = remember(sections) { sections.filter { it.name.equals("General", ignoreCase = true) } }
-                    val videoSections = remember(sections) { sections.filter { it.name.startsWith("Video", ignoreCase = true) } }
-                    val audioSections = remember(sections) { sections.filter { it.name.startsWith("Audio", ignoreCase = true) } }
-                    val subtitleSections = remember(sections) { sections.filter { it.name.startsWith("Text", ignoreCase = true) } }
-                    val otherSections = remember(sections) {
-                        sections.filter {
-                            !it.name.equals("General", ignoreCase = true) &&
-                            !it.name.startsWith("Video", ignoreCase = true) &&
-                            !it.name.startsWith("Audio", ignoreCase = true) &&
-                            !it.name.startsWith("Text", ignoreCase = true)
-                        }
-                    }
-
-                    SelectionContainer(modifier = Modifier.weight(1f)) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                            when (selectedTab) {
-                                0 -> {
-                                    // Overview / General properties
-                                    if (generalSections.isNotEmpty()) {
-                                        generalSections.forEach { section ->
-                                            section.properties.forEach { (key, value) ->
-                                                PropertyRow(key, value)
-                                            }
-                                        }
-                                    } else {
-                                        // Fallback default info
-                                        InfoItem("Filename", video.title)
-                                        InfoItem("Duration", formatDuration(video.duration))
-                                        InfoItem("Size", formatSize(video.size))
-                                    }
-
-                                    // Always show file path - MediaInfo General section rarely
-                                    // contains the full Android filesystem path
-                                    if (video.path.isNotBlank()) {
-                                        PropertyRow("Location", video.path)
-                                    }
-
-                                    if (video.dateAdded > 0) {
-                                        PropertyRow("Date Added", formatDate(video.dateAdded))
-                                    }
-
-                                    // Display any other unmatched sections (e.g. Menu) inside Overview
-                                    if (otherSections.isNotEmpty()) {
-                                        otherSections.forEach { section ->
-                                            Spacer(modifier = Modifier.height(16.dp))
-                                            Text(
-                                                text = section.name,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.padding(bottom = 8.dp)
-                                            )
-                                            section.properties.forEach { (key, value) ->
-                                                PropertyRow(key, value)
-                                            }
-                                        }
-                                    }
-                                }
-                                1 -> {
-                                    // Video Stream properties
-                                    if (videoSections.isNotEmpty()) {
-                                        videoSections.forEachIndexed { index, section ->
-                                            if (videoSections.size > 1) {
-                                                Text(
-                                                    text = section.name,
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.padding(vertical = 12.dp)
-                                                )
-                                            }
-                                            section.properties.forEach { (key, value) ->
-                                                PropertyRow(key, value)
-                                            }
-                                        }
-                                    } else {
-                                        if (video.width > 0 && video.height > 0) {
-                                            InfoItem("Resolution", "${video.width}x${video.height}")
-                                        }
-                                        if (video.frameRate != null && video.frameRate > 0) {
-                                            InfoItem("Frame Rate", "${video.frameRate} fps")
-                                        }
-                                        InfoItem("Video Codec", "Advanced details unavailable.")
-                                    }
-                                }
-                                2 -> {
-                                    // Audio Stream properties
-                                    if (audioSections.isNotEmpty()) {
-                                        audioSections.forEachIndexed { index, section ->
-                                            Text(
-                                                text = section.name,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.padding(vertical = 12.dp)
-                                            )
-                                            section.properties.forEach { (key, value) ->
-                                                PropertyRow(key, value)
-                                            }
-                                        }
-                                    } else {
-                                        Box(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "No audio stream details found",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                                3 -> {
-                                    // Subtitle Stream properties
-                                    if (subtitleSections.isNotEmpty()) {
-                                        subtitleSections.forEachIndexed { index, section ->
-                                            Text(
-                                                text = section.name,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.secondary,
-                                                modifier = Modifier.padding(vertical = 12.dp)
-                                            )
-                                            section.properties.forEach { (key, value) ->
-                                                PropertyRow(key, value)
-                                            }
-                                        }
-                                    } else {
-                                        Box(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "No embedded subtitle streams found",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // Fallback default single video details
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        InfoItem("Name", video.title)
-                        InfoItem("Duration", formatDuration(video.duration))
-                        InfoItem("Size", formatSize(video.size))
-                        if (!video.resolution.isNullOrBlank()) {
-                            InfoItem("Resolution", video.resolution)
-                        } else if (video.width > 0 && video.height > 0) {
-                            InfoItem("Resolution", "${video.width}x${video.height}")
-                        }
-                        if (video.frameRate != null && video.frameRate > 0) {
-                            InfoItem("Frame Rate", "${video.frameRate.toInt()} fps")
-                        }
-                        if (video.dateAdded > 0) {
-                            InfoItem("Date Added", formatDate(video.dateAdded))
-                        }
-                        InfoItem("Path", video.path)
-                    }
-                }
+                SingleVideoInformationContent(
+                    video = selectedVideos.first(),
+                    modifier = Modifier.fillMaxSize(),
+                    isScrollable = true
+                )
             } else {
                 val totalSize = selectedVideos.sumOf { it.size }
                 val totalDuration = selectedVideos.sumOf { it.duration }
@@ -384,6 +94,308 @@ fun InformationBottomSheet(
                     InfoItem("Total Duration", formatDuration(totalDuration))
                     InfoItem("Location(s)", distinctFolders.joinToString(", "))
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun SingleVideoInformationContent(
+    video: Video,
+    modifier: Modifier = Modifier,
+    isScrollable: Boolean = true
+) {
+    val context = LocalContext.current
+    var fullMediaInfoText by remember(video.uri) { mutableStateOf<String?>(null) }
+    var isLoadingInfo by remember(video.uri) { mutableStateOf(false) }
+
+    LaunchedEffect(video.uri) {
+        isLoadingInfo = true
+        val uri = runCatching { Uri.parse(video.uri) }.getOrNull()
+        if (uri != null) {
+            MediaInfoOps.generateTextOutput(context, uri, video.title)
+                .onSuccess {
+                    fullMediaInfoText = it
+                    isLoadingInfo = false
+                }
+                .onFailure {
+                    isLoadingInfo = false
+                }
+        } else {
+            isLoadingInfo = false
+        }
+    }
+
+    val parsed = remember(video.title, video.duration) { MediaInfoParser.parse(video.title, video.duration) }
+
+    Column(modifier = modifier) {
+        // Premium visual Title Card
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+            ),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = parsed.title.ifBlank { video.title.substringBeforeLast(".") },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val typeLabel = when (parsed.type) {
+                        "tv" -> "TV Show"
+                        "movie" -> "Movie"
+                        else -> parsed.type
+                    }
+                    SuggestionChip(
+                        onClick = {},
+                        label = { Text(typeLabel, style = MaterialTheme.typography.labelSmall) },
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                        )
+                    )
+                    if (parsed.year != null) {
+                        SuggestionChip(
+                            onClick = {},
+                            label = { Text(parsed.year, style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                    if (parsed.season != null && parsed.episode != null) {
+                        SuggestionChip(
+                            onClick = {},
+                            label = { Text("S${parsed.season}E${parsed.episode}", style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Sleek custom pill segment selectors (Overview, Video, Audio, Subtitles)
+        var selectedTab by remember { mutableStateOf(0) }
+        val tabs = listOf("Overview", "Video", "Audio", "Subtitles")
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            tabs.forEachIndexed { index, title ->
+                val isSelected = selectedTab == index
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        )
+                        .clickable { selectedTab = index }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        if (isLoadingInfo) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(180.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Analyzing media file...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else if (fullMediaInfoText != null) {
+            val sections = remember(fullMediaInfoText) { parseMediaInfoText(fullMediaInfoText!!) }
+
+            val generalSections = remember(sections) { sections.filter { it.name.equals("General", ignoreCase = true) } }
+            val videoSections = remember(sections) { sections.filter { it.name.startsWith("Video", ignoreCase = true) } }
+            val audioSections = remember(sections) { sections.filter { it.name.startsWith("Audio", ignoreCase = true) } }
+            val subtitleSections = remember(sections) { sections.filter { it.name.startsWith("Text", ignoreCase = true) } }
+            val otherSections = remember(sections) {
+                sections.filter {
+                    !it.name.equals("General", ignoreCase = true) &&
+                    !it.name.startsWith("Video", ignoreCase = true) &&
+                    !it.name.startsWith("Audio", ignoreCase = true) &&
+                    !it.name.startsWith("Text", ignoreCase = true)
+                }
+            }
+
+            val detailsContent = @Composable {
+                Column(
+                    modifier = if (isScrollable) Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                    else Modifier.fillMaxWidth()
+                ) {
+                    when (selectedTab) {
+                        0 -> {
+                            if (generalSections.isNotEmpty()) {
+                                generalSections.forEach { section ->
+                                    section.properties.forEach { (key, value) ->
+                                        PropertyRow(key, value)
+                                    }
+                                }
+                            } else {
+                                InfoItem("Filename", video.title)
+                                InfoItem("Duration", formatDuration(video.duration))
+                                InfoItem("Size", formatSize(video.size))
+                            }
+
+                            if (video.path.isNotBlank()) {
+                                PropertyRow("Location", video.path)
+                            }
+
+                            if (video.dateAdded > 0) {
+                                PropertyRow("Date Added", formatDate(video.dateAdded))
+                            }
+
+                            if (otherSections.isNotEmpty()) {
+                                otherSections.forEach { section ->
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = section.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                    section.properties.forEach { (key, value) ->
+                                        PropertyRow(key, value)
+                                    }
+                                }
+                            }
+                        }
+                        1 -> {
+                            if (videoSections.isNotEmpty()) {
+                                videoSections.forEachIndexed { _, section ->
+                                    if (videoSections.size > 1) {
+                                        Text(
+                                            text = section.name,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(vertical = 12.dp)
+                                        )
+                                    }
+                                    section.properties.forEach { (key, value) ->
+                                        PropertyRow(key, value)
+                                    }
+                                }
+                            } else {
+                                if (video.width > 0 && video.height > 0) {
+                                    InfoItem("Resolution", "${video.width}x${video.height}")
+                                }
+                                if (video.frameRate != null && video.frameRate > 0) {
+                                    InfoItem("Frame Rate", "${video.frameRate} fps")
+                                }
+                                InfoItem("Video Codec", "Advanced details unavailable.")
+                            }
+                        }
+                        2 -> {
+                            if (audioSections.isNotEmpty()) {
+                                audioSections.forEachIndexed { _, section ->
+                                    Text(
+                                        text = section.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(vertical = 12.dp)
+                                    )
+                                    section.properties.forEach { (key, value) ->
+                                        PropertyRow(key, value)
+                                    }
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No audio stream details found",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                        3 -> {
+                            if (subtitleSections.isNotEmpty()) {
+                                subtitleSections.forEachIndexed { _, section ->
+                                    Text(
+                                        text = section.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.padding(vertical = 12.dp)
+                                    )
+                                    section.properties.forEach { (key, value) ->
+                                        PropertyRow(key, value)
+                                    }
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No embedded subtitle streams found",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isScrollable) {
+                SelectionContainer(modifier = Modifier.weight(1f)) {
+                    detailsContent()
+                }
+            } else {
+                SelectionContainer(modifier = Modifier.fillMaxWidth()) {
+                    detailsContent()
+                }
+            }
+        } else {
+            // Fallback default single video details
+            Column(
+                modifier = if (isScrollable) Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())
+                else Modifier.fillMaxWidth()
+            ) {
+                InfoItem("Name", video.title)
+                InfoItem("Duration", formatDuration(video.duration))
+                InfoItem("Size", formatSize(video.size))
+                if (!video.resolution.isNullOrBlank()) {
+                    InfoItem("Resolution", video.resolution)
+                } else if (video.width > 0 && video.height > 0) {
+                    InfoItem("Resolution", "${video.width}x${video.height}")
+                }
+                if (video.frameRate != null && video.frameRate > 0) {
+                    InfoItem("Frame Rate", "${video.frameRate.toInt()} fps")
+                }
+                if (video.dateAdded > 0) {
+                    InfoItem("Date Added", formatDate(video.dateAdded))
+                }
+                InfoItem("Path", video.path)
             }
         }
     }

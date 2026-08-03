@@ -43,6 +43,7 @@ import com.devson.nvplayer.ui.common.PlayerControls
 import com.devson.nvplayer.ui.common.GestureOverlay
 import com.devson.nvplayer.ui.common.icons.AspectIcons
 import com.devson.nvplayer.domain.model.PlayerButton
+import com.devson.nvplayer.domain.model.Video
 import kotlinx.coroutines.delay
 import android.media.AudioManager
 import android.content.Context
@@ -83,7 +84,6 @@ import com.devson.nvplayer.data.repository.FullScreenMode
 import com.devson.nvplayer.data.repository.OrientationMode
 import com.devson.nvplayer.data.repository.SoftButtonMode
 import com.devson.nvplayer.player.model.AspectMode
-import com.devson.nvplayer.domain.model.Video
 import com.devson.nvplayer.ui.screen.videolist.components.common.PlayingIndicator
 import com.devson.nvplayer.ui.screen.videolist.components.video.VideoThumbnail
 import com.devson.nvplayer.ui.screen.videolist.components.video.DurationBadge
@@ -213,6 +213,27 @@ fun PlayerScreen(
     val activeViewModel = viewModel ?: resolvedViewModel
     val bufferedPosition by (activeViewModel?.bufferedPosition ?: kotlinx.coroutines.flow.MutableStateFlow(bufferedPosition)).collectAsStateWithLifecycle()
     val engineMediaTitle by (activeViewModel?.mediaTitle ?: kotlinx.coroutines.flow.MutableStateFlow("")).collectAsStateWithLifecycle()
+    val currentUri by (activeViewModel?.currentUri ?: kotlinx.coroutines.flow.MutableStateFlow(null)).collectAsStateWithLifecycle()
+    val activeVideoWidth by (activeViewModel?.videoWidth ?: kotlinx.coroutines.flow.MutableStateFlow(0L)).collectAsStateWithLifecycle()
+    val activeVideoHeight by (activeViewModel?.videoHeight ?: kotlinx.coroutines.flow.MutableStateFlow(0L)).collectAsStateWithLifecycle()
+    val activeDuration by (activeViewModel?.duration ?: kotlinx.coroutines.flow.MutableStateFlow(0L)).collectAsStateWithLifecycle()
+
+    val currentVideo = remember(currentVideoId, currentUri, engineMediaTitle, activeDuration, activeVideoWidth, activeVideoHeight, queueList) {
+        queueList.firstOrNull { it.uri == currentVideoId || (currentUri != null && it.uri == currentUri.toString()) }
+            ?: currentUri?.let { uri ->
+                Video(
+                    uri = uri.toString(),
+                    title = engineMediaTitle.ifBlank { uri.lastPathSegment ?: "Video" },
+                    duration = activeDuration,
+                    folderName = uri.path?.substringBeforeLast('/', "")?.substringAfterLast('/') ?: "",
+                    path = uri.path ?: "",
+                    size = 0L,
+                    width = activeVideoWidth.toInt(),
+                    height = activeVideoHeight.toInt()
+                )
+            }
+    }
+
     val isFrameCaptureMode by (activeViewModel?.isFrameCaptureMode ?: kotlinx.coroutines.flow.MutableStateFlow(false)).collectAsStateWithLifecycle()
     val currentFrame by (activeViewModel?.currentFrame ?: kotlinx.coroutines.flow.MutableStateFlow(0L)).collectAsStateWithLifecycle()
     val totalFrames by (activeViewModel?.totalFrames ?: kotlinx.coroutines.flow.MutableStateFlow(0L)).collectAsStateWithLifecycle()
@@ -317,18 +338,19 @@ fun PlayerScreen(
     // For content:// (MediaStore) URIs, lastPathSegment is just the row ID (e.g.
     // "1000551661").  Query ContentResolver for the actual DISPLAY_NAME instead.
     val videoTitle: String = remember(currentUri, engineMediaTitle) {
-        if (currentUri == null) {
+        val activeUri = currentUri
+        if (activeUri == null) {
             return@remember if (!engineMediaTitle.isNullOrBlank()) engineMediaTitle else "Local Video"
         }
         
-        val scheme = currentUri.scheme
+        val scheme = activeUri.scheme
         val isLocal = scheme == null || scheme == "content" || scheme == "file"
         
         if (isLocal) {
             // For local videos, try ContentResolver first to get DISPLAY_NAME
             try {
                 context.contentResolver.query(
-                    currentUri,
+                    activeUri,
                     arrayOf(MediaStore.MediaColumns.DISPLAY_NAME),
                     null, null, null
                 )?.use { cursor ->
@@ -348,7 +370,7 @@ fun PlayerScreen(
             } catch (_: Exception) { }
             
             // If ContentResolver fails, try to extract from the path segment
-            val seg = currentUri.lastPathSegment ?: currentUri.toString()
+            val seg = activeUri.lastPathSegment ?: activeUri.toString()
             val name = seg.substringAfterLast('/')
             // Only use the segment name if it is not just a numeric ID and we have a valid engineMediaTitle
             val isNumericId = name.all { it.isDigit() }
@@ -376,7 +398,7 @@ fun PlayerScreen(
         }
         
         // Final fallback: segment extraction
-        val seg = currentUri.lastPathSegment ?: currentUri.toString()
+        val seg = activeUri.lastPathSegment ?: activeUri.toString()
         val name = seg.substringAfterLast('/')
         val dot = name.lastIndexOf('.')
         if (dot > 0) name.substring(0, dot) else name
@@ -987,6 +1009,7 @@ fun PlayerScreen(
             visible = showPlayerSettingsSideSheet,
             currentSpeed = playbackSpeed,
             playbackSettings = playbackSettings,
+            currentVideo = currentVideo,
             onSpeedSelected = { speed ->
                 onUpdateCustomPlaybackSpeed(speed)
             },
