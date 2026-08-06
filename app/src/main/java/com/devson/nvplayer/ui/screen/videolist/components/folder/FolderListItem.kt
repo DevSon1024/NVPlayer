@@ -145,7 +145,7 @@ fun FolderListItem(
         targetValue  = if (isSelected)
             MaterialTheme.colorScheme.primaryContainer
         else
-            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.surfaceContainerLow,
         animationSpec = tween(180),
         label = "folderListBg"
     )
@@ -153,7 +153,7 @@ fun FolderListItem(
         targetValue  = if (isSelected)
             MaterialTheme.colorScheme.primary
         else
-            Color.Transparent,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
         animationSpec = tween(180),
         label = "folderListBorder"
     )
@@ -161,15 +161,15 @@ fun FolderListItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .padding(horizontal = 12.dp, vertical = 5.dp)
+            .clip(RoundedCornerShape(20.dp))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        shape     = RoundedCornerShape(16.dp),
+        shape     = RoundedCornerShape(20.dp),
         colors    = CardDefaults.cardColors(containerColor = bgColor),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isSelected) 0.dp else 1.dp
+            defaultElevation = if (isSelected) 0.dp else 0.5.dp
         ),
-        border = BorderStroke(if (isSelected) 1.5.dp else 0.dp, borderColor)
+        border = BorderStroke(if (isSelected) 1.5.dp else 1.dp, borderColor)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             Row(
@@ -288,6 +288,7 @@ fun FolderInfoDialog(
     val allVideos = selectedFolders.flatMap { folder -> videosByFolder[folder] ?: emptyList() }
     val totalVideos = allVideos.size
     val totalSize = allVideos.sumOf { it.size }
+    val totalDuration = allVideos.sumOf { it.duration }
     val location = if (selectedFolders.size == 1) {
         val firstVideo = allVideos.firstOrNull()
         if (firstVideo != null && firstVideo.path.contains("/")) {
@@ -317,6 +318,9 @@ fun FolderInfoDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 InfoRow(label = stringResource(R.string.folder_info_total_videos), value = "$totalVideos")
                 InfoRow(label = stringResource(R.string.folder_info_total_size), value = formatSize(totalSize))
+                if (totalDuration > 0L) {
+                    InfoRow(label = "Total Duration", value = com.devson.nvplayer.util.formatDuration(totalDuration))
+                }
                 InfoRow(label = stringResource(R.string.folder_info_location), value = location)
                 if (oldestDate != null && oldestDate > 0L) {
                     InfoRow(label = stringResource(R.string.folder_info_creation_date), value = formatDate(oldestDate))

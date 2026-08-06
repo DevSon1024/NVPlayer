@@ -808,27 +808,35 @@ fun VideoListScreen(
 
     // INFORMATION BOTTOM SHEET
     if (showInfoBottomSheet && isSelectionActive) {
-        val videosToShow = when (viewSettings.viewMode) {
-            ViewMode.FILES -> selectedVideos
-            ViewMode.ALL_FOLDERS -> {
-                if (selectedFolder != null) {
-                    selectedVideos
-                } else {
-                    selectedFolders.flatMap { videosByFolder[it] ?: emptyList() }.toSet()
+        if (selectedFolders.isNotEmpty() && selectedVideos.isEmpty()) {
+            com.devson.nvplayer.ui.screen.videolist.components.folder.FolderInfoDialog(
+                selectedFolders = selectedFolders,
+                videosByFolder = videosByFolder,
+                onDismiss = { showInfoBottomSheet = false }
+            )
+        } else {
+            val videosToShow = when (viewSettings.viewMode) {
+                ViewMode.FILES -> selectedVideos
+                ViewMode.ALL_FOLDERS -> {
+                    if (selectedFolder != null) {
+                        selectedVideos
+                    } else {
+                        selectedFolders.flatMap { videosByFolder[it] ?: emptyList() }.toSet()
+                    }
+                }
+                ViewMode.FOLDERS -> {
+                    val allVideosFlat = videosFlat
+                    val fromFolders = selectedFolders.flatMap { f -> 
+                        allVideosFlat.filter { it.path.startsWith(f.id) } 
+                    }
+                    (selectedVideos + fromFolders).toSet()
                 }
             }
-            ViewMode.FOLDERS -> {
-                val allVideosFlat = videosFlat
-                val fromFolders = selectedFolders.flatMap { f -> 
-                    allVideosFlat.filter { it.path.startsWith(f.id) } 
-                }
-                (selectedVideos + fromFolders).toSet()
-            }
+            InformationBottomSheet(
+                selectedVideos = videosToShow,
+                onDismiss = { showInfoBottomSheet = false }
+            )
         }
-        InformationBottomSheet(
-            selectedVideos = videosToShow,
-            onDismiss = { showInfoBottomSheet = false }
-        )
     }
 
     //RENAME DIALOG

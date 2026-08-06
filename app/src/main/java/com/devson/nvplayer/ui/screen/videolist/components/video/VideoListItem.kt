@@ -51,7 +51,7 @@ fun VideoListItem(
         targetValue  = if (isSelected)
             MaterialTheme.colorScheme.primaryContainer
         else
-            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.surfaceContainerLow,
         animationSpec = tween(180),
         label = "listItemBg"
     )
@@ -59,7 +59,7 @@ fun VideoListItem(
         targetValue  = if (isSelected)
             MaterialTheme.colorScheme.primary
         else
-            Color.Transparent,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
         animationSpec = tween(180),
         label = "listItemBorder"
     )
@@ -67,8 +67,8 @@ fun VideoListItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .padding(horizontal = 12.dp, vertical = 5.dp)
+            .clip(RoundedCornerShape(20.dp))
             .combinedClickable(
                 onClick    = { onClick(video) },
                 onLongClick = {
@@ -76,14 +76,14 @@ fun VideoListItem(
                     onLongClick(video)
                 }
             ),
-        shape     = RoundedCornerShape(16.dp),
+        shape     = RoundedCornerShape(20.dp),
         colors    = CardDefaults.cardColors(containerColor = bgColor),
         elevation = CardDefaults.cardElevation(
-            defaultElevation  = if (isSelected) 0.dp else 1.dp,
+            defaultElevation  = if (isSelected) 0.dp else 0.5.dp,
             pressedElevation  = 0.dp
         ),
         border = BorderStroke(
-            width = if (isSelected) 1.5.dp else 0.dp,
+            width = if (isSelected) 1.5.dp else 1.dp,
             color = borderColor
         )
     ) {

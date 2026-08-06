@@ -28,10 +28,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -1204,21 +1206,26 @@ fun LatestVideoItem(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val cardWidth = remember(screenWidth) { ((screenWidth - 40.dp) / 3.5f).coerceIn(85.dp, 105.dp) }
+    val cardHeight = remember(cardWidth) { cardWidth * 0.68f }
+
     Card(
         modifier = modifier
-            .width(160.dp)
-            .height(110.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .width(cardWidth)
+            .height(cardHeight)
+            .clip(RoundedCornerShape(12.dp))
             .border(
                 1.dp,
                 MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                RoundedCornerShape(16.dp)
+                RoundedCornerShape(12.dp)
             )
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.Black
         )
@@ -1238,16 +1245,17 @@ fun LatestVideoItem(
                         Brush.verticalGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.8f)
+                                Color.Black.copy(alpha = 0.85f)
                             )
                         )
                     )
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .padding(horizontal = 4.dp, vertical = 3.dp)
             ) {
                 Text(
                     text = video.title,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

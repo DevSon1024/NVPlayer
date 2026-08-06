@@ -54,7 +54,7 @@ fun VideoGridItem(
         targetValue  = if (isSelected)
             MaterialTheme.colorScheme.primaryContainer
         else
-            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.surfaceContainerLow,
         animationSpec = tween(180),
         label = "gridItemBg"
     )
@@ -62,7 +62,7 @@ fun VideoGridItem(
         targetValue  = if (isSelected)
             MaterialTheme.colorScheme.primary
         else
-            Color.Transparent,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
         animationSpec = tween(180),
         label = "gridItemBorder"
     )

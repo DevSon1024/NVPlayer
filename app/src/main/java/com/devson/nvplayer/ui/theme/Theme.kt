@@ -17,11 +17,11 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
 val NosvedShapes = Shapes(
-    extraSmall = RoundedCornerShape(2.dp),
-    small      = RoundedCornerShape(4.dp),
-    medium     = RoundedCornerShape(6.dp),
-    large      = RoundedCornerShape(8.dp),
-    extraLarge = RoundedCornerShape(12.dp)
+    extraSmall = RoundedCornerShape(6.dp),
+    small      = RoundedCornerShape(10.dp),
+    medium     = RoundedCornerShape(14.dp),
+    large      = RoundedCornerShape(18.dp),
+    extraLarge = RoundedCornerShape(24.dp)
 )
 
 @Composable

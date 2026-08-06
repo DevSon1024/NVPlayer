@@ -1044,6 +1044,7 @@ fun PlayerScreen(
         ChaptersSideSheet(
             visible = showChaptersSideSheet,
             chapters = chapters,
+            currentPositionMs = currentPosition,
             onSelectChapter = onSelectChapter,
             onDismiss = { showChaptersSideSheet = false }
         )

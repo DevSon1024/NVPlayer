@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
 import androidx.compose.material3.*
@@ -32,12 +33,18 @@ import com.devson.nvplayer.ui.common.formatTime
 fun ChaptersSideSheet(
     visible: Boolean,
     chapters: List<ChapterInfo>,
+    currentPositionMs: Long = 0L,
     onSelectChapter: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val sheetWidthPercent = if (isLandscape) 0.5f else 0.75f
+
+    val currentChapterIndex = remember(chapters, currentPositionMs) {
+        if (chapters.isEmpty()) -1
+        else chapters.indexOfLast { it.timeMs <= currentPositionMs }
+    }
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -152,6 +159,7 @@ fun ChaptersSideSheet(
                                 key = { it.index },
                                 contentType = { "chapter_item" }
                             ) { chapter ->
+                                val isCurrent = chapter.index == currentChapterIndex
                                 val formattedTime = remember(chapter.timeMs) { formatTime(chapter.timeMs) }
                                 val onClick = remember(chapter) {
                                     {
@@ -165,8 +173,14 @@ fun ChaptersSideSheet(
                                         .clip(RoundedCornerShape(12.dp))
                                         .clickable(onClick = onClick),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                                    )
+                                        containerColor = if (isCurrent) 
+                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                                        else 
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                    ),
+                                    border = if (isCurrent) 
+                                        androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) 
+                                    else null
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -175,20 +189,33 @@ fun ChaptersSideSheet(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(
-                                            text = chapter.title,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            if (isCurrent) {
+                                                Icon(
+                                                    imageVector = Icons.Default.PlayArrow,
+                                                    contentDescription = "Current chapter",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                            Text(
+                                                text = chapter.title,
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold,
+                                                color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
                                         Box(
                                             modifier = Modifier
                                                 .background(
-                                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                                    color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
                                                     shape = RoundedCornerShape(8.dp)
                                                 )
                                                 .padding(horizontal = 10.dp, vertical = 4.dp)
@@ -197,7 +224,7 @@ fun ChaptersSideSheet(
                                                 text = formattedTime,
                                                 style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                color = if (isCurrent) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
                                             )
                                         }
                                     }
