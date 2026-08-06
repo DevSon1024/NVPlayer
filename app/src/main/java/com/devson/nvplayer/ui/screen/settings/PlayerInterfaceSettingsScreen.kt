@@ -147,14 +147,6 @@ fun PlayerInterfaceSettingsScreen(
                 )
 
                 SettingToggleCard(
-                    icon = Icons.Default.Gradient,
-                    title = "Show Control Gradients",
-                    subtitle = "Show top and bottom black fade behind player controls",
-                    checked = playbackSettings.showControlGradients,
-                    onCheckedChange = { settingsViewModel.updateShowControlGradients(it) }
-                )
-
-                SettingToggleCard(
                     icon = Icons.Rounded.QueuePlayNext,
                     title = "Enable Show Up Next",
                     subtitle = "Tap the video title during playback to show the queue",
@@ -324,6 +316,14 @@ fun PlayerInterfaceSettingsScreen(
                     subtitle = "Display battery status and device clock on control bar",
                     checked = playbackSettings.showBatteryClockOverlay,
                     onCheckedChange = { settingsViewModel.updateShowBatteryClockOverlay(it) }
+                )
+
+                SettingToggleCard(
+                    icon = Icons.Default.Gradient,
+                    title = "Controls Backdrop Dimming",
+                    subtitle = "Show top and bottom black fade behind player controls",
+                    checked = playbackSettings.showControlGradients,
+                    onCheckedChange = { settingsViewModel.updateShowControlGradients(it) }
                 )
             }
 

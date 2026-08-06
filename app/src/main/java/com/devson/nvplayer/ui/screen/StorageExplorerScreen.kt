@@ -1,5 +1,6 @@
 package com.devson.nvplayer.ui.screen
 
+import androidx.activity.compose.BackHandler
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
@@ -66,6 +67,16 @@ fun StorageExplorerScreen(
 
     val root = remember { Environment.getExternalStorageDirectory() }
     var currentDir by remember { mutableStateOf(root) }
+
+    val canGoUp = currentDir.absolutePath != root.absolutePath
+    BackHandler(enabled = canGoUp) {
+        val parent = currentDir.parentFile
+        if (parent != null && parent.absolutePath.startsWith(root.absolutePath)) {
+            currentDir = parent
+        } else {
+            currentDir = root
+        }
+    }
     var entries by remember { mutableStateOf<List<FileNode>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     val isProcessing by fileOpsViewModel.operationInProgress.collectAsState()

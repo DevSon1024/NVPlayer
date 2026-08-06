@@ -217,43 +217,11 @@ fun PlayerSettingsSideSheet(
                             .statusBarsPadding()
                     }
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Settings,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Text(
-                                text = "Player Settings",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = "Close sheet"
-                            )
-                        }
-                    }
-
                     // Tab selector row
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp)
                             .background(
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
                                 shape = RoundedCornerShape(12.dp)
@@ -349,6 +317,7 @@ fun PlayerSettingsSideSheet(
                                 playbackSettings = playbackSettings,
                                 onUpdateShowRemainingTime = onUpdateShowRemainingTime,
                                 onUpdateShowBatteryClockOverlay = onUpdateShowBatteryClockOverlay,
+                                onUpdateShowControlGradients = onUpdateShowControlGradients,
                                 onUpdateIsAmbientModeEnabled = onUpdateIsAmbientModeEnabled,
                                 onUpdateAmbientBlurStyle = onUpdateAmbientBlurStyle
                             )
@@ -1089,16 +1058,6 @@ private fun InterfaceTab(
             SheetDivider()
 
             SheetToggleRow(
-                icon = Icons.Default.Gradient,
-                title = "Show Control Gradients",
-                subtitle = "Show top and bottom black fade behind player controls",
-                checked = playbackSettings.showControlGradients,
-                onCheckedChange = onUpdateShowControlGradients
-            )
-
-            SheetDivider()
-
-            SheetToggleRow(
                 icon = Icons.Rounded.QueuePlayNext,
                 title = "Enable Show Up Next",
                 subtitle = "Tap the video title during playback to show the queue",
@@ -1169,6 +1128,7 @@ private fun OverlaysTab(
     playbackSettings: PlaybackSettings,
     onUpdateShowRemainingTime: (Boolean) -> Unit,
     onUpdateShowBatteryClockOverlay: (Boolean) -> Unit,
+    onUpdateShowControlGradients: (Boolean) -> Unit = {},
     onUpdateIsAmbientModeEnabled: (Boolean) -> Unit = {},
     onUpdateAmbientBlurStyle: (com.devson.nvplayer.data.repository.AmbientBlurStyle) -> Unit = {}
 ) {
@@ -1280,6 +1240,16 @@ private fun OverlaysTab(
                 subtitle = "Display battery status and device clock on control bar",
                 checked = playbackSettings.showBatteryClockOverlay,
                 onCheckedChange = onUpdateShowBatteryClockOverlay
+            )
+
+            SheetDivider()
+
+            SheetToggleRow(
+                icon = Icons.Default.Gradient,
+                title = "Controls Backdrop Dimming",
+                subtitle = "Show top and bottom black fade behind player controls",
+                checked = playbackSettings.showControlGradients,
+                onCheckedChange = onUpdateShowControlGradients
             )
         }
     }

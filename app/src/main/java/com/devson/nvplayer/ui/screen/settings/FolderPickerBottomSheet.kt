@@ -1,5 +1,6 @@
 package com.devson.nvplayer.ui.screen.settings
 
+import androidx.activity.compose.BackHandler
 import android.os.Environment
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -58,6 +59,16 @@ fun FolderPickerBottomSheet(
 
     val rootFile by remember(selectedStorage) {
         derivedStateOf { File(selectedStorage?.rootPath ?: Environment.getExternalStorageDirectory().absolutePath) }
+    }
+
+    val canGoUp = currentDir.absolutePath != rootFile.absolutePath
+    BackHandler(enabled = canGoUp) {
+        val parent = currentDir.parentFile
+        if (parent != null && parent.absolutePath.startsWith(rootFile.absolutePath)) {
+            currentDir = parent
+        } else {
+            currentDir = rootFile
+        }
     }
 
     var subfolders by remember { mutableStateOf<List<PickerFolderNode>>(emptyList()) }

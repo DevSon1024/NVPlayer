@@ -113,6 +113,14 @@ fun VideoListTopAppBar(
                         contentDescription = if (allSelected) "Unselect All" else "Select All"
                     )
                 }
+                onPlayFolder?.let { onClick ->
+                    IconButton(onClick = onClick) {
+                        Icon(
+                            imageVector = Icons.Filled.PlayCircle,
+                            contentDescription = "Feed Play"
+                        )
+                    }
+                }
             }
         )
     } else {
@@ -222,30 +230,14 @@ fun VideoListTopAppBar(
                             Icon(Icons.Filled.Close, contentDescription = "Close Search")
                         }
                     } else {
-                        if (showBackButton) {
-                            // VideoListScreen (where video of these folders are)
-                            IconButton(onClick = { onSearchActiveChange(true) }) {
-                                Icon(Icons.Filled.Search, contentDescription = "Search")
-                            }
-                            IconButton(onClick = onShowSettings) {
-                                Icon(imageVector = Icons.Filled.Tune, contentDescription = "View Settings")
-                            }
-                            onPlayFolder?.let { onClick ->
-                                IconButton(onClick = onClick) {
-                                    Icon(imageVector = Icons.Filled.PlayCircle, contentDescription = "Play Folder in Feed")
-                                }
-                            }
-                        } else {
-                            // FolderListScreen (where folders are)
-                            IconButton(onClick = { onSearchActiveChange(true) }) {
-                                Icon(Icons.Filled.Search, contentDescription = "Search")
-                            }
-                            IconButton(onClick = onShowSettings) {
-                                Icon(imageVector = Icons.Filled.Tune, contentDescription = "View Settings")
-                            }
-                            IconButton(onClick = onNavigateToSettings) {
-                                Icon(imageVector = Icons.Filled.Settings, contentDescription = "Settings")
-                            }
+                        IconButton(onClick = { onSearchActiveChange(true) }) {
+                            Icon(Icons.Filled.Search, contentDescription = "Search")
+                        }
+                        IconButton(onClick = onShowSettings) {
+                            Icon(imageVector = Icons.Filled.Tune, contentDescription = "View Settings")
+                        }
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(imageVector = Icons.Filled.Settings, contentDescription = "Settings")
                         }
                     }
                 }
