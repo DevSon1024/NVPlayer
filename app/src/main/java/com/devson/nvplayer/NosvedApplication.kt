@@ -42,7 +42,7 @@ class NosvedApplication : Application(), SingletonImageLoader.Factory {
             }
             .memoryCache {
                 MemoryCache.Builder()
-                    .maxSizePercent(context, 0.20)
+                    .maxSizePercent(context, 0.25)
                     .build()
             }
             .diskCache {

@@ -171,17 +171,17 @@ fun PreviewFloatingActionButton(
                 .clip(FabShape)
                 .combinedClickable(
                     onClick = {
-                        if (isPreviewVisible) {
-                            isPreviewVisible = false
+                        if (isMenuExpanded) {
+                            isMenuExpanded = false
+                        } else if (enablePreview && previewUri != null) {
+                            isPreviewVisible = !isPreviewVisible
                         } else {
-                            isMenuExpanded = !isMenuExpanded
+                            onPlay()
                         }
                     },
                     onLongClick = {
-                        if (enablePreview && previewUri != null) {
-                            isMenuExpanded = false
-                            isPreviewVisible = true
-                        }
+                        isPreviewVisible = false
+                        isMenuExpanded = !isMenuExpanded
                     }
                 ),
             shape = FabShape,

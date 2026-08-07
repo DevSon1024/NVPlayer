@@ -148,6 +148,9 @@ fun HomeScreen(
     var showNetworkDialog by remember { mutableStateOf(false) }
     var showYtdlpMissingDialog by remember { mutableStateOf(false) }
 
+    val scrollState = rememberScrollState()
+    val isFabExpanded = remember { derivedStateOf { !scrollState.isScrollInProgress } }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
@@ -178,7 +181,7 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(
                     top = padding.calculateTopPadding(),
                     bottom = padding.calculateBottomPadding() + 24.dp
@@ -356,12 +359,32 @@ fun HomeScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Text(
-                                    text = "Continue Watching",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 20.dp)
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 20.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Continue Watching",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (continueWatchingVideos.isNotEmpty()) {
+                                        FilledTonalButton(
+                                            onClick = onSeeMoreHistoryClick,
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = "See All",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+                                }
 
                                 if (continueWatchingVideos.isNotEmpty()) {
                                     val maxVideos = 10
@@ -423,14 +446,19 @@ fun HomeScreen(
                                                         .maskClip(RoundedCornerShape(24.dp))
                                                 )
                                             } else {
-                                                Card(
+                                                ElevatedCard(
                                                     modifier = Modifier
                                                         .height(220.dp)
                                                         .width(150.dp)
-                                                        .maskClip(RoundedCornerShape(24.dp))
+                                                        .maskClip(MaterialTheme.shapes.extraLarge)
                                                         .clickable { onSeeMoreHistoryClick() },
-                                                    colors = CardDefaults.cardColors(
+                                                    shape = MaterialTheme.shapes.extraLarge,
+                                                    colors = CardDefaults.elevatedCardColors(
                                                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                                    ),
+                                                    elevation = CardDefaults.elevatedCardElevation(
+                                                        defaultElevation = 3.dp,
+                                                        pressedElevation = 6.dp
                                                     )
                                                 ) {
                                                     Box(
@@ -445,7 +473,7 @@ fun HomeScreen(
                                                                 modifier = Modifier
                                                                     .size(48.dp)
                                                                     .background(
-                                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                                                        MaterialTheme.colorScheme.primaryContainer,
                                                                         CircleShape
                                                                     ),
                                                                 contentAlignment = Alignment.Center
@@ -453,16 +481,15 @@ fun HomeScreen(
                                                                 Icon(
                                                                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                                                     contentDescription = "See More",
-                                                                    tint = MaterialTheme.colorScheme.primary,
-                                                                    modifier = Modifier.size(28.dp)
+                                                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
                                                                 )
                                                             }
-                                                            Spacer(modifier = Modifier.height(8.dp))
+                                                            Spacer(Modifier.height(8.dp))
                                                             Text(
-                                                                text = "See More",
-                                                                style = MaterialTheme.typography.bodyMedium,
+                                                                text = "See All",
+                                                                style = MaterialTheme.typography.titleMedium,
                                                                 fontWeight = FontWeight.Bold,
-                                                                color = MaterialTheme.colorScheme.primary
+                                                                color = MaterialTheme.colorScheme.onSurface
                                                             )
                                                         }
                                                     }
@@ -1211,23 +1238,21 @@ fun LatestVideoItem(
     val cardWidth = remember(screenWidth) { ((screenWidth - 40.dp) / 3.5f).coerceIn(85.dp, 105.dp) }
     val cardHeight = remember(cardWidth) { cardWidth * 0.68f }
 
-    Card(
+    ElevatedCard(
         modifier = modifier
             .width(cardWidth)
             .height(cardHeight)
-            .clip(RoundedCornerShape(12.dp))
-            .border(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                RoundedCornerShape(12.dp)
-            )
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.Black
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        elevation = CardDefaults.elevatedCardElevation(
+            defaultElevation = 2.dp,
+            pressedElevation = 4.dp
         )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -1336,21 +1361,19 @@ fun HistoryCardItem(
     val progress = if (video.duration > 0) lastPositionMs.toFloat() / video.duration else 0f
     val formattedProgress = "${formatDuration(lastPositionMs)} / ${formatDuration(video.duration)}"
 
-    Card(
+    ElevatedCard(
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
-            .border(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
-                RoundedCornerShape(24.dp)
-            )
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = { menuExpanded = true }
             ),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.Black
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        elevation = CardDefaults.elevatedCardElevation(
+            defaultElevation = 3.dp,
+            pressedElevation = 6.dp
         )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {

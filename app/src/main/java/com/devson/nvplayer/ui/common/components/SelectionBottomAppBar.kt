@@ -1,5 +1,15 @@
 package com.devson.nvplayer.ui.common.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -110,46 +121,61 @@ fun SelectionBottomAppBar(
             ),
             tonalElevation = 6.dp,
             shadowElevation = 10.dp,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.wrapContentWidth()
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                    .animateContentSize(
+                        animationSpec = spring(
+                            dampingRatio = 0.55f,
+                            stiffness = Spring.StiffnessLow
+                        )
+                    )
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Move
                 ActionColumn(
                     icon = Icons.AutoMirrored.Filled.DriveFileMove,
                     label = "Move",
-                    onClick = onMove,
-                    modifier = Modifier.weight(1f)
+                    onClick = onMove
                 )
                 // Copy
                 ActionColumn(
                     icon = Icons.Filled.ContentCopy,
                     label = "Copy",
-                    onClick = onCopy,
-                    modifier = Modifier.weight(1f)
+                    onClick = onCopy
                 )
                 // Delete
                 ActionColumn(
                     icon = Icons.Filled.Delete,
                     label = "Delete",
-                    onClick = onDelete,
-                    modifier = Modifier.weight(1f)
+                    onClick = onDelete
                 )
-                // Rename
-                if (selectedFolders.size == 1) {
+                // Rename with rubber animation
+                AnimatedVisibility(
+                    visible = selectedFolders.size == 1,
+                    enter = expandHorizontally(
+                        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
+                        expandFrom = Alignment.CenterHorizontally
+                    ) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) + scaleIn(
+                        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
+                        initialScale = 0.7f
+                    ),
+                    exit = shrinkHorizontally(
+                        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
+                        shrinkTowards = Alignment.CenterHorizontally
+                    ) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)) + scaleOut(
+                        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
+                        targetScale = 0.7f
+                    )
+                ) {
                     ActionColumn(
                         icon = Icons.Filled.DriveFileRenameOutline,
                         label = "Rename",
-                        onClick = onRename,
-                        modifier = Modifier.weight(1f)
+                        onClick = onRename
                     )
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
                 }
                 // Share (with file count warning)
                 ActionColumn(
@@ -161,8 +187,7 @@ fun SelectionBottomAppBar(
                         } else {
                             onShare()
                         }
-                    },
-                    modifier = Modifier.weight(1f)
+                    }
                 )
             }
         }
@@ -181,7 +206,7 @@ private fun ActionColumn(
         modifier = modifier
             .clip(CircleShape)
             .clickable { onClick() }
-            .padding(vertical = 8.dp)
+            .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         Icon(
             imageVector = icon,

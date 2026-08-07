@@ -1,7 +1,10 @@
 package com.devson.nvplayer.ui.common.sheets
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -26,100 +29,137 @@ import com.devson.nvplayer.ui.common.RotarySortWheelDialog
 import com.devson.nvplayer.util.formatSortField
 import com.devson.nvplayer.viewmodel.VideoListViewModel
 
-// VIEW SETTINGS BOTTOM SHEET
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ViewSettingsBottomSheet(
     settings: ViewSettings,
-    isFolderView: Boolean,
+    isFolderView: Boolean = false,
     onDismiss: () -> Unit,
     viewModel: VideoListViewModel
 ) {
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var isFieldsExpanded by remember { mutableStateOf(false) }
+    var isAdvancedExpanded by remember { mutableStateOf(false) }
+    var showSortWheel by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
-                .padding(vertical = 16.dp)
+                .padding(bottom = 16.dp)
         ) {
-            Text(
-                "View Settings",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
+            // Header Row
             Row(
-                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                verticalAlignment = Alignment.Top
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // View Mode
-                Column(modifier = Modifier.weight(1.5f)) {
-                    SettingsSectionLabel("View Mode")
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        IconToggleButton(
-                            label = "All folders",
-                            selected = settings.viewMode == ViewMode.ALL_FOLDERS,
-                            selectedIcon = Icons.Filled.FolderCopy,
-                            unselectedIcon = Icons.Outlined.FolderCopy,
-                            modifier = Modifier.weight(1f),
-                            onClick = { viewModel.updateViewMode(ViewMode.ALL_FOLDERS) }
-                        )
-                        IconToggleButton(
-                            label = "Files",
-                            selected = settings.viewMode == ViewMode.FILES,
-                            selectedIcon = Icons.Filled.Description,
-                            unselectedIcon = Icons.Outlined.Description,
-                            modifier = Modifier.weight(1f),
-                            onClick = { viewModel.updateViewMode(ViewMode.FILES) }
-                        )
-                        IconToggleButton(
-                            label = "Explorer",
-                            selected = settings.viewMode == ViewMode.FOLDERS,
-                            selectedIcon = Icons.Filled.Folder,
-                            unselectedIcon = Icons.Outlined.Folder,
-                            modifier = Modifier.weight(1f),
-                            onClick = { viewModel.updateViewMode(ViewMode.FOLDERS) }
-                        )
+                Text(
+                    text = "Layout Settings",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Close",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            // Section 1: View Mode
+            SettingsSectionHeader(text = "View Mode")
+            Spacer(modifier = Modifier.height(6.dp))
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                SegmentedButton(
+                    selected = settings.viewMode == ViewMode.ALL_FOLDERS,
+                    onClick = { viewModel.updateViewMode(ViewMode.ALL_FOLDERS) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                    icon = { Icon(if (settings.viewMode == ViewMode.ALL_FOLDERS) Icons.Filled.FolderCopy else Icons.Outlined.FolderCopy, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                ) {
+                    Text("Folders", style = MaterialTheme.typography.labelSmall)
+                }
+                SegmentedButton(
+                    selected = settings.viewMode == ViewMode.FILES,
+                    onClick = { viewModel.updateViewMode(ViewMode.FILES) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                    icon = { Icon(if (settings.viewMode == ViewMode.FILES) Icons.Filled.Description else Icons.Outlined.Description, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                ) {
+                    Text("Files", style = MaterialTheme.typography.labelSmall)
+                }
+                SegmentedButton(
+                    selected = settings.viewMode == ViewMode.FOLDERS,
+                    onClick = { viewModel.updateViewMode(ViewMode.FOLDERS) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                    icon = { Icon(if (settings.viewMode == ViewMode.FOLDERS) Icons.Filled.Folder else Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                ) {
+                    Text("Explorer", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Section 2: Layout Style & Sort Order Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    SettingsSectionHeader(text = "Layout")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = settings.layoutMode == LayoutMode.LIST,
+                            onClick = { viewModel.updateLayoutMode(LayoutMode.LIST) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                            icon = { Icon(if (settings.layoutMode == LayoutMode.LIST) Icons.Filled.ViewAgenda else Icons.Outlined.ViewAgenda, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        ) {
+                            Text("List", style = MaterialTheme.typography.labelSmall)
+                        }
+                        SegmentedButton(
+                            selected = settings.layoutMode == LayoutMode.GRID,
+                            onClick = { viewModel.updateLayoutMode(LayoutMode.GRID) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                            icon = { Icon(if (settings.layoutMode == LayoutMode.GRID) Icons.Filled.GridView else Icons.Outlined.GridView, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        ) {
+                            Text("Grid", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
-                
-                VerticalDivider(
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .padding(top = 36.dp, bottom = 8.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
 
-                // Layout
                 Column(modifier = Modifier.weight(1f)) {
-                    SettingsSectionLabel("Layout")
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        IconToggleButton(
-                            label = "List",
-                            selected = settings.layoutMode == LayoutMode.LIST,
-                            selectedIcon = Icons.Filled.ViewAgenda,
-                            unselectedIcon = Icons.Outlined.ViewAgenda,
-                            modifier = Modifier.weight(1f),
-                            onClick = { viewModel.updateLayoutMode(LayoutMode.LIST) }
+                    SettingsSectionHeader(text = "Sort Order")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    FilledTonalButton(
+                        onClick = { showSortWheel = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (settings.sortDirection == SortDirection.ASCENDING) Icons.Outlined.ArrowUpward else Icons.Outlined.ArrowDownward,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
                         )
-                        IconToggleButton(
-                            label = "Grid",
-                            selected = settings.layoutMode == LayoutMode.GRID,
-                            selectedIcon = Icons.Filled.GridView,
-                            unselectedIcon = Icons.Outlined.GridView,
-                            modifier = Modifier.weight(1f),
-                            onClick = { viewModel.updateLayoutMode(LayoutMode.GRID) }
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = formatSortField(settings.sortField),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
                         )
                     }
                 }
@@ -127,58 +167,24 @@ fun ViewSettingsBottomSheet(
 
             if (settings.layoutMode == LayoutMode.GRID) {
                 Spacer(modifier = Modifier.height(10.dp))
-                SettingsSectionLabel("Grid Columns")
-                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        (1..4).forEach { columns ->
-                            val isSelected = settings.gridColumns == columns
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .background(
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
-                                    .border(
-                                        width = 1.dp,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable { viewModel.updateGridColumns(columns) },
-                                contentAlignment = Alignment.Center
+                    SettingsSectionHeader(text = "Grid Columns")
+                    SingleChoiceSegmentedButtonRow {
+                        (1..4).forEachIndexed { index, columns ->
+                            SegmentedButton(
+                                selected = settings.gridColumns == columns,
+                                onClick = { viewModel.updateGridColumns(columns) },
+                                shape = SegmentedButtonDefaults.itemShape(index = index, count = 4)
                             ) {
-                                Text(
-                                    text = columns.toString(),
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
+                                Text(columns.toString(), style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
                 }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
-
-            //  Sort 
-            SettingsSectionLabel("Sort By")
-            var showSortWheel by remember { mutableStateOf(false) }
-            OutlinedButton(
-                onClick = { showSortWheel = true },
-                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                val dirText = if (settings.sortDirection == SortDirection.ASCENDING) "↑ Ascending" else "↓ Descending"
-                Text(
-                    "${formatSortField(settings.sortField)}  $dirText",
-                    style = MaterialTheme.typography.bodySmall
-                )
             }
 
             if (showSortWheel) {
@@ -191,67 +197,237 @@ fun ViewSettingsBottomSheet(
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
 
-            //  Fields (3 × 3 grid) 
-            SettingsSectionLabel("Fields")
-            Spacer(modifier = Modifier.height(4.dp))
+            // Section 3: Expandable Metadata Fields Dropdown
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isFieldsExpanded = !isFieldsExpanded }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Outlined.Visibility,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Visible Metadata Fields",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Icon(
+                            imageVector = if (isFieldsExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            contentDescription = if (isFieldsExpanded) "Collapse" else "Expand",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
-            val fieldItems: List<Triple<String, Boolean, (Boolean) -> Unit>> = listOf(
-                Triple("Thumbnail", settings.showThumbnail) { viewModel.updateShowThumbnail(it) },
-                Triple("Length", settings.showLength) { viewModel.updateShowLength(it) },
-                Triple("File Ext.", settings.showFileExtension) { viewModel.updateShowFileExtension(it) },
-                Triple("Played Time", settings.showPlayedTime) { viewModel.updateShowPlayedTime(it) },
-                Triple("Resolution", settings.showResolution) { viewModel.updateShowResolution(it) },
-                Triple("Path", settings.showPath) { viewModel.updateShowPath(it) },
-                Triple("Size", settings.showSize) { viewModel.updateShowSize(it) },
-                Triple("Date", settings.showDate) { viewModel.updateShowDate(it) },
-                Triple("FPS", settings.showFrameRate) { viewModel.updateShowFrameRate(it) },
-            )
+                    AnimatedVisibility(
+                        visible = isFieldsExpanded,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            val fieldItems: List<Triple<String, Boolean, (Boolean) -> Unit>> = listOf(
+                                Triple("Thumbnail", settings.showThumbnail) { viewModel.updateShowThumbnail(it) },
+                                Triple("Length", settings.showLength) { viewModel.updateShowLength(it) },
+                                Triple("File Ext.", settings.showFileExtension) { viewModel.updateShowFileExtension(it) },
+                                Triple("Played Time", settings.showPlayedTime) { viewModel.updateShowPlayedTime(it) },
+                                Triple("Resolution", settings.showResolution) { viewModel.updateShowResolution(it) },
+                                Triple("Path", settings.showPath) { viewModel.updateShowPath(it) },
+                                Triple("Size", settings.showSize) { viewModel.updateShowSize(it) },
+                                Triple("Date", settings.showDate) { viewModel.updateShowDate(it) },
+                                Triple("FPS", settings.showFrameRate) { viewModel.updateShowFrameRate(it) }
+                            )
 
-            // 3 rows × 3 cols
-            val chunked = fieldItems.chunked(3)
-            Column(modifier = Modifier.fillMaxWidth()) {
-                chunked.forEach { rowItems ->
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        rowItems.forEach { (label, checked, onChange) ->
-                            Box(Modifier.weight(1f)) {
-                                CompactMetadataToggle(
-                                    label = label,
-                                    checked = checked,
-                                    onCheckedChange = onChange
-                                )
+                            val chunked = fieldItems.chunked(3)
+                            chunked.forEach { rowItems ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    rowItems.forEach { (label, checked, onChange) ->
+                                        Box(Modifier.weight(1f)) {
+                                            CompactMetadataToggle(
+                                                label = label,
+                                                checked = checked,
+                                                onCheckedChange = onChange
+                                            )
+                                        }
+                                    }
+                                    repeat(3 - rowItems.size) { Box(Modifier.weight(1f)) }
+                                }
                             }
                         }
-                        // Pad remaining slots if last row has < 3 items
-                        repeat(3 - rowItems.size) { Box(Modifier.weight(1f)) }
                     }
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            //  Advanced 
-            SettingsSectionLabel("Advanced")
-            Spacer(modifier = Modifier.height(4.dp))
-            AdvancedToggleRow(
-                label = "Select via Thumbnail",
-                checked = settings.selectByThumbnail,
-                subtitle = "Click thumbnail to select video in list layout"
-            ) { viewModel.updateSelectByThumbnail(it) }
-            AdvancedToggleRow("Length over Thumbnail", settings.displayLengthOverThumbnail) { viewModel.updateDisplayLengthOverThumbnail(it) }
+            // Section 4: Expandable Advanced Options Dropdown
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isAdvancedExpanded = !isAdvancedExpanded }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Outlined.Tune,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Advanced Options",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Icon(
+                            imageVector = if (isAdvancedExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            contentDescription = if (isAdvancedExpanded) "Collapse" else "Expand",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                    AnimatedVisibility(
+                        visible = isAdvancedExpanded,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 12.dp, end = 12.dp, bottom = 10.dp)
+                        ) {
+                            AdvancedToggleRow(
+                                label = "Select via Thumbnail",
+                                checked = settings.selectByThumbnail,
+                                subtitle = "Click thumbnail to select video in list layout"
+                            ) { viewModel.updateSelectByThumbnail(it) }
+                            AdvancedToggleRow(
+                                label = "Length over Thumbnail",
+                                checked = settings.displayLengthOverThumbnail,
+                                subtitle = "Overlay duration badge on top of thumbnail"
+                            ) { viewModel.updateDisplayLengthOverThumbnail(it) }
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-//  HELPER COMPONENTS 
+@Composable
+fun SettingsSectionHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary
+    )
+}
+
+@Composable
+fun CompactMetadataToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.size(28.dp)
+        )
+        Spacer(Modifier.width(2.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+    }
+}
+
+@Composable
+fun MetadataToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+fun AdvancedToggleRow(
+    label: String,
+    checked: Boolean,
+    subtitle: String? = null,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.small)
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(label, style = MaterialTheme.typography.bodySmall)
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                )
+            }
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
 
 @Composable
 fun SettingsSectionLabel(text: String) {
     Text(
-        text,
+        text = text,
         style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.primary
@@ -273,7 +449,7 @@ fun IconToggleButton(
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(MaterialTheme.shapes.small)
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp, horizontal = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -294,72 +470,5 @@ fun IconToggleButton(
             maxLines = 1,
             softWrap = false
         )
-    }
-}
-
-// COMPACT METADATA TOGGLE (checkbox + small label)
-@Composable
-fun CompactMetadataToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Checkbox(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            modifier = Modifier.size(32.dp)
-        )
-        Text(label, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-    }
-}
-
-// METADATA TOGGLE ROW (kept for backward compatibility if used elsewhere)
-@Composable
-fun MetadataToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.Start,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-// ADVANCED TOGGLE ROW
-@Composable
-fun AdvancedToggleRow(
-    label: String,
-    checked: Boolean,
-    subtitle: String? = null,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-            Text(label, style = MaterialTheme.typography.bodySmall)
-            if (subtitle != null) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-                )
-            }
-        }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

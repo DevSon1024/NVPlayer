@@ -17,7 +17,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -235,7 +235,7 @@ fun VideoListTopAppBar(
                             Icon(Icons.Filled.Search, contentDescription = "Search")
                         }
                         IconButton(onClick = onShowSettings) {
-                            Icon(imageVector = Icons.Filled.Tune, contentDescription = "View Settings")
+                            Icon(imageVector = Icons.Outlined.Tune, contentDescription = "View Settings")
                         }
                         IconButton(onClick = onNavigateToSettings) {
                             Icon(imageVector = Icons.Filled.Settings, contentDescription = "Settings")

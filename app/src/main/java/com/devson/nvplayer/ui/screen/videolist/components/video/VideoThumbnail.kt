@@ -35,6 +35,34 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.devson.nvplayer.util.formatDuration
 
+import androidx.compose.material.icons.filled.MovieFilter
+import androidx.compose.ui.graphics.vector.ImageVector
+
+/**
+ * A branded Material Design 3 placeholder displayed while video thumbnails load.
+ * Uses surfaceContainerHighest with a subtle centered vector watermark icon.
+ */
+@Composable
+fun BrandedThumbnailPlaceholder(
+    modifier: Modifier = Modifier,
+    icon: ImageVector = Icons.Filled.MovieFilter,
+    iconAlpha: Float = 0.35f
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(36.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = iconAlpha)
+        )
+    }
+}
+
 @Composable
 fun VideoThumbnail(
     uri: String,
@@ -48,22 +76,23 @@ fun VideoThumbnail(
             .size(512, 384)
             .memoryCachePolicy(CachePolicy.ENABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
-            .crossfade(true)
+            .crossfade(300)
             .build()
     }
     Box(
-        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest)
     ) {
+        // Branded M3 watermark placeholder visible during loading
+        BrandedThumbnailPlaceholder()
+
         AsyncImage(
             model = imageRequest,
-            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-            error       = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
             contentDescription = "Video Thumbnail",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
         if (showPlayIcon) {
-            // Gradient scrim so icon is legible over any thumbnail colour
+            // Gradient scrim so icon is legible over any thumbnail color
             Box(
                 modifier = Modifier
                     .fillMaxSize()
