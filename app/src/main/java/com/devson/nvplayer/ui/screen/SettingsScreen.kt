@@ -25,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.devson.nvplayer.BuildConfig
 import com.devson.nvplayer.R
+import com.devson.nvplayer.ui.common.components.AnimatedNosvedLogo
 import com.devson.nvplayer.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -396,11 +397,9 @@ private fun AppIdentityCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector     = Icons.Default.OndemandVideo,
-                    contentDescription = null,
-                    modifier        = Modifier.size(36.dp),
-                    tint            = MaterialTheme.colorScheme.onPrimary
+                AnimatedNosvedLogo(
+                    modifier = Modifier.size(38.dp),
+                    color    = MaterialTheme.colorScheme.onPrimary
                 )
             }
 
