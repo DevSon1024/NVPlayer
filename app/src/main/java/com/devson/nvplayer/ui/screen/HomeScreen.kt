@@ -1236,7 +1236,7 @@ fun LatestVideoItem(
                 modifier = Modifier.fillMaxSize(),
                 showPlayIcon = false
             )
-            DurationBadge(duration = video.duration)
+            DurationBadge(duration = video.duration, alignment = Alignment.TopStart)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

@@ -363,19 +363,42 @@ fun VideoListScreen(
                         viewModel.selectFolder(null)
                     }
                 },
-                onPlayFolder = if ((viewSettings.viewMode == ViewMode.ALL_FOLDERS && selectedFolder != null) ||
-                                  (viewSettings.viewMode == ViewMode.FOLDERS && currentExplorerPath != baseRoot)) {
-                    {
-                        val folderVideos = when (viewSettings.viewMode) {
-                            ViewMode.ALL_FOLDERS -> videosByFolder[selectedFolder] ?: emptyList()
-                            ViewMode.FOLDERS -> explorerItems.filterIsInstance<ExplorerItem.VideoItem>().map { it.video }
-                            else -> emptyList()
+                onPlayFolder = {
+                    val playlist: List<Video> = when {
+                        selectedVideos.isNotEmpty() -> {
+                            val viewVideos = when (viewSettings.viewMode) {
+                                ViewMode.FILES -> videosFlat
+                                ViewMode.ALL_FOLDERS -> if (selectedFolder != null) (videosByFolder[selectedFolder] ?: emptyList()) else videosFlat
+                                ViewMode.FOLDERS -> explorerItems.filterIsInstance<ExplorerItem.VideoItem>().map { it.video }
+                            }
+                            viewVideos.applySort(viewSettings.sortField, viewSettings.sortDirection)
                         }
-                        val sortedVideos = folderVideos.applySort(viewSettings.sortField, viewSettings.sortDirection)
-                        viewModel.setFeedVideos(sortedVideos)
-                        onNavigateToFeed(0)
+                        selectedFolders.isNotEmpty() -> {
+                            val folderIds = selectedFolders.map { it.id }
+                            videosFlat.filter { video -> folderIds.any { id -> video.path.startsWith(id) } }
+                                .applySort(viewSettings.sortField, viewSettings.sortDirection)
+                        }
+                        else -> {
+                            val viewVideos = when (viewSettings.viewMode) {
+                                ViewMode.FILES -> videosFlat
+                                ViewMode.ALL_FOLDERS -> if (selectedFolder != null) (videosByFolder[selectedFolder] ?: emptyList()) else videosFlat
+                                ViewMode.FOLDERS -> explorerItems.filterIsInstance<ExplorerItem.VideoItem>().map { it.video }
+                            }
+                            viewVideos.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                        }
                     }
-                } else null,
+                    val startIdx = if (selectedVideos.isNotEmpty()) {
+                        val firstSel = selectedVideos.first()
+                        playlist.indexOfFirst { it.uri == firstSel.uri }.coerceAtLeast(0)
+                    } else 0
+
+                    if (playlist.isNotEmpty()) {
+                        viewModel.setFeedVideos(playlist)
+                        onNavigateToFeed(startIdx)
+                        selectedVideos = emptySet()
+                        selectedFolders = emptySet()
+                    }
+                },
                 availableStorages = availableStorages,
                 selectedStorage = selectedStorage,
                 onStorageSelected = { storage -> viewModel.onStorageSelected(storage) }
@@ -416,23 +439,14 @@ fun VideoListScreen(
                     }
                 }
 
-                // In ALL_FOLDERS folder-list view, keep the original SelectionBottomAppBar
-                // for its folder-centric features (Play All folder, Rename folder, etc.)
-                val useFolderBar = viewSettings.viewMode == ViewMode.ALL_FOLDERS
-                    && selectedFolder == null
-                    && selectedFolders.isNotEmpty()
+                // If only folders are selected, show folder selection bar with move, copy, delete, rename, share (with warning)
+                val useFolderBar = selectedFolders.isNotEmpty() && selectedVideos.isEmpty()
 
                 if (useFolderBar) {
                     SelectionBottomAppBar(
                         selectedFolders = selectedFolders,
                         videosByFolder = videosByFolder,
                         viewSettings = viewSettings,
-                        onFeedPlay = { videos ->
-                            val sorted = videos.applySort(viewSettings.sortField, viewSettings.sortDirection)
-                            viewModel.setFeedVideos(sorted)
-                            onNavigateToFeed(0)
-                            selectedFolders = emptySet()
-                        },
                         onClearSelection = { selectedFolders = emptySet() },
                         onMove = {
                             if (selectedUris.isNotEmpty()) {
@@ -461,54 +475,12 @@ fun VideoListScreen(
                             shareVideos(context, videos)
                             selectedFolders = emptySet()
                             selectedVideos = emptySet()
-                        },
-                        onMarkStatus = { status ->
-                            selectedFolders.flatMap { videosByFolder[it] ?: emptyList() }.forEach { video ->
-                                val position = when(status) {
-                                    "NEW" -> 0L
-                                    "RUNNING" -> video.duration / 2
-                                    "ENDED" -> video.duration
-                                    else -> 0L
-                                }
-                                homeViewModel.setWatchStatus(video, position)
-                            }
-                            selectedFolders = emptySet()
-                            selectedVideos = emptySet()
-                        },
-                        showTagAndShare = true
+                        }
                     )
                 } else {
-                    // FILES, FOLDERS mode, or ALL_FOLDERS inside a specific folder:
-                    // use the video-centric bar driven by the unified selectedUris list
+                    // Video/file selection bar: show move, copy, delete, rename, share, tag
                     VideoSelectionBottomBar(
                         selectedVideos = selectedVideos,
-                        onFeedPlay = {
-                            // Determine the full current playlist depending on view mode
-                            val fullPlaylist: List<Video> = when (viewSettings.viewMode) {
-                                ViewMode.FILES -> {
-                                    val allVideos = videosFlat
-                                    allVideos.applySort(viewSettings.sortField, viewSettings.sortDirection)
-                                }
-                                ViewMode.ALL_FOLDERS -> {
-                                    val folderVideos = videosByFolder[selectedFolder] ?: videosFlat
-                                    folderVideos.applySort(viewSettings.sortField, viewSettings.sortDirection)
-                                }
-                                ViewMode.FOLDERS -> {
-                                    explorerItems.filterIsInstance<ExplorerItem.VideoItem>().map { it.video }
-                                        .applySort(viewSettings.sortField, viewSettings.sortDirection)
-                                }
-                            }
-                            // Find start index: the first selected video in the full sorted playlist
-                            val firstSelected = selectedVideos.firstOrNull()
-                            val startIdx = if (firstSelected != null) {
-                                fullPlaylist.indexOfFirst { it.uri == firstSelected.uri }.takeIf { it >= 0 } ?: 0
-                            } else 0
-                            if (fullPlaylist.isNotEmpty()) {
-                                viewModel.setFeedVideos(fullPlaylist)
-                                onNavigateToFeed(startIdx)
-                                selectedVideos = emptySet()
-                            }
-                        },
                         onMove = {
                             if (selectedUris.isNotEmpty()) {
                                 storageExplorerUris = selectedUris

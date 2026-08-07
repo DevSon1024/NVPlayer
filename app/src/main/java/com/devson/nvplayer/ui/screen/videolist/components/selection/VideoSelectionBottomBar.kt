@@ -1,24 +1,27 @@
 package com.devson.nvplayer.ui.screens.videolist.components.selection
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
-import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,8 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.devson.nvplayer.domain.model.Video
@@ -38,7 +41,6 @@ import com.devson.nvplayer.util.TagStatusDialog
 @Composable
 fun VideoSelectionBottomBar(
     selectedVideos: Set<Video>,
-    onFeedPlay: () -> Unit,
     onMove: () -> Unit,
     onCopy: () -> Unit,
     onDelete: () -> Unit,
@@ -59,45 +61,81 @@ fun VideoSelectionBottomBar(
         )
     }
 
-    BottomAppBar(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp, start = 16.dp, end = 16.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+            ),
+            tonalElevation = 6.dp,
+            shadowElevation = 10.dp,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            // FeedPlay
-            ActionColumn(
-                icon = Icons.Filled.PlayCircle,
-                label = "FeedPlay",
-                onClick = onFeedPlay
-            )
-            // Move
-            ActionColumn(icon = Icons.AutoMirrored.Filled.DriveFileMove, label = "Move", onClick = onMove)
-            // Copy
-            ActionColumn(icon = Icons.Filled.ContentCopy, label = "Copy", onClick = onCopy)
-            // Delete
-            ActionColumn(icon = Icons.Filled.Delete, label = "Delete", onClick = onDelete)
-            // Rename
-            if (selectedVideos.size == 1) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Move
                 ActionColumn(
-                    icon = Icons.Filled.DriveFileRenameOutline,
-                    label = "Rename",
-                    onClick = onRename
+                    icon = Icons.AutoMirrored.Filled.DriveFileMove,
+                    label = "Move",
+                    onClick = onMove,
+                    modifier = Modifier.weight(1f)
                 )
-            }
-            // Share
-            if (showTagAndShare) {
-                ActionColumn(icon = Icons.Filled.Share, label = "Share", onClick = onShare)
-            }
-            // Tagging
-            if (showTagAndShare) {
-                ActionColumn(icon = Icons.AutoMirrored.Filled.Label, label = "Tag", onClick = { showTagDialog = true })
+                // Copy
+                ActionColumn(
+                    icon = Icons.Filled.ContentCopy,
+                    label = "Copy",
+                    onClick = onCopy,
+                    modifier = Modifier.weight(1f)
+                )
+                // Delete
+                ActionColumn(
+                    icon = Icons.Filled.Delete,
+                    label = "Delete",
+                    onClick = onDelete,
+                    modifier = Modifier.weight(1f)
+                )
+                // Rename
+                if (selectedVideos.size == 1) {
+                    ActionColumn(
+                        icon = Icons.Filled.DriveFileRenameOutline,
+                        label = "Rename",
+                        onClick = onRename,
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+                // Share
+                if (showTagAndShare) {
+                    ActionColumn(
+                        icon = Icons.Filled.Share,
+                        label = "Share",
+                        onClick = onShare,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                // Tagging
+                if (showTagAndShare) {
+                    ActionColumn(
+                        icon = Icons.AutoMirrored.Filled.Label,
+                        label = "Tag",
+                        onClick = { showTagDialog = true },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
@@ -107,16 +145,29 @@ fun VideoSelectionBottomBar(
 private fun ActionColumn(
     icon: ImageVector,
     label: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+        modifier = modifier
+            .clip(CircleShape)
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(vertical = 8.dp)
     ) {
-        Icon(icon, contentDescription = label)
-        Text(label, fontSize = 10.sp)
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1
+        )
     }
 }

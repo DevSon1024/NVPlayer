@@ -48,6 +48,12 @@ import androidx.compose.ui.unit.dp
 import com.devson.nvplayer.domain.model.StorageVolumeInfo
 import com.devson.nvplayer.ui.common.popup.SearchSuggestionsPopup
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Surface
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoListTopAppBar(
@@ -114,12 +120,7 @@ fun VideoListTopAppBar(
                     )
                 }
                 onPlayFolder?.let { onClick ->
-                    IconButton(onClick = onClick) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayCircle,
-                            contentDescription = "Feed Play"
-                        )
-                    }
+                    FeedPlayCapsuleButton(onClick = onClick)
                 }
             }
         )
@@ -252,6 +253,32 @@ fun VideoListTopAppBar(
                     }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun FeedPlayCapsuleButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier = modifier.padding(end = 4.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.PlayCircle,
+                contentDescription = "FeedPlay",
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

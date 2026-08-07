@@ -141,11 +141,15 @@ fun ThumbnailSelectionOverlay(isSelected: Boolean, isDense: Boolean = false) {
 }
 
 @Composable
-fun BoxScope.DurationBadge(duration: Long, isGrid: Boolean = false) {
+fun BoxScope.DurationBadge(
+    duration: Long,
+    isGrid: Boolean = false,
+    alignment: Alignment = Alignment.BottomEnd
+) {
     val formattedDuration = remember(duration) { formatDuration(duration) }
     Box(
         modifier = Modifier
-            .align(Alignment.BottomEnd)
+            .align(alignment)
             .padding(if (isGrid) 6.dp else 4.dp)
             .background(
                 color = Color.Black.copy(alpha = 0.72f),

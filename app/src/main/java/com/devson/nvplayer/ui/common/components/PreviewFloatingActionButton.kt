@@ -62,8 +62,15 @@ import coil3.request.crossfade
 import coil3.video.videoFrameMillis
 import com.devson.nvplayer.util.formatDuration
 
-private val FabShape = RoundedCornerShape(16.dp)
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+
+private val FabShape = CircleShape
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PreviewFloatingActionButton(
     enablePreview: Boolean,
@@ -161,23 +168,22 @@ fun PreviewFloatingActionButton(
         Surface(
             modifier = Modifier
                 .size(56.dp)
-                .pointerInput(enablePreview, isMenuExpanded, isPreviewVisible, previewUri) {
-                    detectTapGestures(
-                        onTap = {
-                            if (isPreviewVisible) {
-                                isPreviewVisible = false
-                            } else {
-                                isMenuExpanded = !isMenuExpanded
-                            }
-                        },
-                        onLongPress = {
-                            if (enablePreview && previewUri != null) {
-                                isMenuExpanded = false
-                                isPreviewVisible = true
-                            }
+                .clip(FabShape)
+                .combinedClickable(
+                    onClick = {
+                        if (isPreviewVisible) {
+                            isPreviewVisible = false
+                        } else {
+                            isMenuExpanded = !isMenuExpanded
                         }
-                    )
-                },
+                    },
+                    onLongClick = {
+                        if (enablePreview && previewUri != null) {
+                            isMenuExpanded = false
+                            isPreviewVisible = true
+                        }
+                    }
+                ),
             shape = FabShape,
             color = fabColor,
             shadowElevation = if (isPreviewVisible || isMenuExpanded) 2.dp else 6.dp,
@@ -209,44 +215,43 @@ private fun SpeedDialItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(4.dp)
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 4.dp,
+        shadowElevation = 6.dp,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+        )
     ) {
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.95f)
-            ),
-            shape = RoundedCornerShape(8.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
         ) {
+            Surface(
+                modifier = Modifier.size(32.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-        }
-        
-        Surface(
-            modifier = Modifier.size(40.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            shadowElevation = 4.dp
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
         }
     }
 }
