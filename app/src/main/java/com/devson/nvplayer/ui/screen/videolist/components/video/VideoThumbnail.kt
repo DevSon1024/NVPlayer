@@ -172,8 +172,8 @@ fun ThumbnailSelectionOverlay(isSelected: Boolean, isDense: Boolean = false) {
 @Composable
 fun BoxScope.DurationBadge(
     duration: Long,
-    isGrid: Boolean = false,
-    alignment: Alignment = Alignment.BottomEnd
+    isGrid: Boolean,
+    alignment: Alignment
 ) {
     val formattedDuration = remember(duration) { formatDuration(duration) }
     Box(
@@ -194,4 +194,27 @@ fun BoxScope.DurationBadge(
             fontSize = if (isGrid) 11.sp else 10.sp
         )
     }
+}
+
+@Composable
+fun BoxScope.DurationBadge(
+    duration: Long
+) {
+    DurationBadge(duration = duration, isGrid = false, alignment = Alignment.BottomEnd)
+}
+
+@Composable
+fun BoxScope.DurationBadge(
+    duration: Long,
+    isGrid: Boolean
+) {
+    DurationBadge(duration = duration, isGrid = isGrid, alignment = Alignment.BottomEnd)
+}
+
+@Composable
+fun BoxScope.DurationBadge(
+    duration: Long,
+    alignment: Alignment
+) {
+    DurationBadge(duration = duration, isGrid = false, alignment = alignment)
 }
