@@ -177,7 +177,10 @@ fun FrameExtractionScreen(
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             OutlinedButton(
-                                onClick = { videoPickerLauncher.launch("video/*") },
+                                onClick = {
+                                    viewModel.resetState()
+                                    videoPickerLauncher.launch("video/*")
+                                },
                                 enabled = !uiState.isExtracting
                             ) {
                                 Text("Change")

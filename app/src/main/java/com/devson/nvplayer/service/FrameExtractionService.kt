@@ -168,6 +168,12 @@ class FrameExtractionService : Service() {
             }
             context.startService(intent)
         }
+
+        fun resetUiState() {
+            if (!_uiState.value.isExtracting) {
+                _uiState.value = ExtractionUiState()
+            }
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

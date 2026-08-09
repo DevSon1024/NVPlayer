@@ -59,6 +59,6 @@ class FrameExtractionViewModel : ViewModel() {
     }
 
     fun resetState() {
-        // Managed by service state
+        FrameExtractionService.resetUiState()
     }
 }
