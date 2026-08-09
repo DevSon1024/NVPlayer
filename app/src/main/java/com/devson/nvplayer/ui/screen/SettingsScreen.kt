@@ -399,7 +399,8 @@ private fun AppIdentityCard(
             ) {
                 AnimatedNosvedLogo(
                     modifier = Modifier.size(38.dp),
-                    color    = MaterialTheme.colorScheme.onPrimary
+                    color    = MaterialTheme.colorScheme.onPrimary,
+                    animateOnEntry = true
                 )
             }
 

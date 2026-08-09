@@ -58,8 +58,30 @@ fun VideoSelectionBottomBar(
     onDelete: () -> Unit,
     onRename: () -> Unit,
     onShare: () -> Unit,
+    onMarkStatus: (String) -> Unit
+) {
+    VideoSelectionBottomBar(
+        selectedVideos = selectedVideos,
+        onMove = onMove,
+        onCopy = onCopy,
+        onDelete = onDelete,
+        onRename = onRename,
+        onShare = onShare,
+        onMarkStatus = onMarkStatus,
+        showTagAndShare = true
+    )
+}
+
+@Composable
+fun VideoSelectionBottomBar(
+    selectedVideos: Set<Video>,
+    onMove: () -> Unit,
+    onCopy: () -> Unit,
+    onDelete: () -> Unit,
+    onRename: () -> Unit,
+    onShare: () -> Unit,
     onMarkStatus: (String) -> Unit,
-    showTagAndShare: Boolean = true
+    showTagAndShare: Boolean
 ) {
     var showTagDialog by remember { mutableStateOf(false) }
 
@@ -170,8 +192,22 @@ fun VideoSelectionBottomBar(
 private fun ActionColumn(
     icon: ImageVector,
     label: String,
+    onClick: () -> Unit
+) {
+    ActionColumn(
+        icon = icon,
+        label = label,
+        onClick = onClick,
+        modifier = Modifier
+    )
+}
+
+@Composable
+private fun ActionColumn(
+    icon: ImageVector,
+    label: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

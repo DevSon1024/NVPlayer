@@ -216,7 +216,9 @@ private fun AboutBrandCard(
             AnimatedNosvedLogo(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
-                    .size(96.dp)
+                    .size(96.dp),
+                color = MaterialTheme.colorScheme.primary,
+                animateOnEntry = true
             )
 
             Text(

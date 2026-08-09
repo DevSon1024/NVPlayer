@@ -4,15 +4,22 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +45,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,9 +52,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -61,12 +68,6 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.video.videoFrameMillis
 import com.devson.nvplayer.util.formatDuration
-
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
-
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 
 private val FabShape = CircleShape
 
@@ -81,57 +82,45 @@ fun PreviewFloatingActionButton(
     onPlay: () -> Unit,
     onNetworkStreamClick: () -> Unit
 ) {
-    var isPreviewVisible by remember { mutableStateOf(false) }
     var isMenuExpanded by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
 
-    LaunchedEffect(enablePreview) {
-        if (!enablePreview) isPreviewVisible = false
-    }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.92f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
+        label = "fabScale"
+    )
+
+    val iconRotation by animateFloatAsState(
+        targetValue = if (isMenuExpanded) 180f else 0f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
+        label = "iconRotation"
+    )
 
     Box(contentAlignment = Alignment.BottomEnd) {
-        // 1. Last Played Preview Card (Long Press)
-        AnimatedVisibility(
-            visible = enablePreview && isPreviewVisible,
-            enter = scaleIn(
-                transformOrigin = TransformOrigin(0.9f, 1f),
-                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow)
-            ) + fadeIn(),
-            exit = scaleOut(
-                transformOrigin = TransformOrigin(0.9f, 1f),
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-            ) + fadeOut(),
-            modifier = Modifier.padding(bottom = 72.dp, end = 4.dp)
-        ) {
-            LastPlayedPreviewCard(
-                uri = previewUri,
-                title = previewTitle,
-                durationMs = previewDurationMs,
-                lastPositionMs = previewLastPositionMs,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable {
-                        isPreviewVisible = false
-                        onPlay()
-                    }
-            )
-        }
-
-        // 2. Speed Dial Menu (Single Tap)
+        // 1. Extending Options UI (Speed Dial & Last Played Preview Card)
         AnimatedVisibility(
             visible = isMenuExpanded,
             enter = scaleIn(
-                transformOrigin = TransformOrigin(0.9f, 1f),
-                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow)
+                transformOrigin = TransformOrigin(0.95f, 1f),
+                animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessLow)
+            ) + slideInVertically(
+                initialOffsetY = { it / 3 },
+                animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessLow)
             ) + fadeIn(),
             exit = scaleOut(
-                transformOrigin = TransformOrigin(0.9f, 1f),
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                transformOrigin = TransformOrigin(0.95f, 1f),
+                animationSpec = spring(stiffness = Spring.StiffnessMedium)
+            ) + slideOutVertically(
+                targetOffsetY = { it / 3 },
+                animationSpec = spring(stiffness = Spring.StiffnessMedium)
             ) + fadeOut(),
             modifier = Modifier.padding(bottom = 72.dp, end = 4.dp)
         ) {
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Option 1: Network Stream
                 SpeedDialItem(
@@ -142,8 +131,23 @@ fun PreviewFloatingActionButton(
                         onNetworkStreamClick()
                     }
                 )
-                // Option 2: Last Played (only if we have a last played video previewUri)
-                if (previewUri != null) {
+
+                // Option 2: Last Played Video Card (if preview is available and enabled)
+                if (enablePreview && previewUri != null) {
+                    LastPlayedPreviewCard(
+                        uri = previewUri,
+                        title = previewTitle,
+                        durationMs = previewDurationMs,
+                        lastPositionMs = previewLastPositionMs,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable {
+                                isMenuExpanded = false
+                                onPlay()
+                            }
+                    )
+                } else if (previewUri != null) {
+                    // Simple speed dial item fallback if preview card is disabled in settings
                     SpeedDialItem(
                         label = "Last Played",
                         icon = Icons.Filled.PlayArrow,
@@ -157,49 +161,56 @@ fun PreviewFloatingActionButton(
         }
 
         val fabColor by animateColorAsState(
-            targetValue = if (isPreviewVisible || isMenuExpanded) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
+            targetValue = if (isMenuExpanded) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary,
             label = "fabColor"
         )
         val iconColor by animateColorAsState(
-            targetValue = if (isPreviewVisible || isMenuExpanded) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary,
+            targetValue = if (isMenuExpanded) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary,
             label = "iconColor"
         )
 
+        // 3. FAB Button with press & long-press interactions
         Surface(
             modifier = Modifier
                 .size(56.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
                 .clip(FabShape)
                 .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
                     onClick = {
                         if (isMenuExpanded) {
                             isMenuExpanded = false
-                        } else if (enablePreview && previewUri != null) {
-                            isPreviewVisible = !isPreviewVisible
                         } else {
                             onPlay()
                         }
                     },
                     onLongClick = {
-                        isPreviewVisible = false
                         isMenuExpanded = !isMenuExpanded
                     }
                 ),
             shape = FabShape,
             color = fabColor,
-            shadowElevation = if (isPreviewVisible || isMenuExpanded) 2.dp else 6.dp,
+            shadowElevation = if (isMenuExpanded) 4.dp else 8.dp,
             tonalElevation = 0.dp
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.rotate(iconRotation)
+            ) {
                 AnimatedContent(
-                    targetState = isPreviewVisible || isMenuExpanded,
+                    targetState = isMenuExpanded,
                     transitionSpec = {
                         (scaleIn() + fadeIn()).togetherWith(scaleOut() + fadeOut())
                     },
                     label = "iconTransition"
-                ) { isClose ->
+                ) { expanded ->
                     Icon(
-                        imageVector = if (isClose) Icons.Filled.Close else Icons.Filled.PlayArrow,
-                        contentDescription = if (isClose) "Close Menu" else "Play",
+                        imageVector = if (expanded) Icons.Filled.Close else Icons.Filled.PlayArrow,
+                        contentDescription = if (expanded) "Close Options" else "Play",
                         tint = iconColor,
                         modifier = Modifier.size(28.dp)
                     )
@@ -222,15 +233,15 @@ private fun SpeedDialItem(
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 4.dp,
         shadowElevation = 6.dp,
-        border = androidx.compose.foundation.BorderStroke(
+        border = BorderStroke(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
         )
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
             Surface(
                 modifier = Modifier.size(32.dp),
@@ -270,19 +281,23 @@ private fun LastPlayedPreviewCard(
     val remainingFormatted = remember(remainingMs) { formatDuration(remainingMs) }
 
     Card(
-        modifier = modifier.width(180.dp),
-        shape = RoundedCornerShape(16.dp),
+        modifier = modifier.width(200.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.95f)
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f)
+        ),
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column {
             Box(
                 modifier = Modifier
-                    .height(101.dp)
+                    .height(110.dp)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
@@ -301,16 +316,16 @@ private fun LastPlayedPreviewCard(
                 }
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.45f)),
+                        .background(Color.Black.copy(alpha = 0.5f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Filled.PlayArrow,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -319,13 +334,15 @@ private fun LastPlayedPreviewCard(
                 val progress = (lastPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
                 LinearProgressIndicator(
                     progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(2.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = Color.Transparent
                 )
             }
 
-            Column(modifier = Modifier.padding(10.dp)) {
+            Column(modifier = Modifier.padding(12.dp)) {
                 Text(
                     text = title ?: "Unknown",
                     style = MaterialTheme.typography.labelLarge,

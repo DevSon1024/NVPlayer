@@ -23,7 +23,12 @@ import androidx.compose.ui.unit.dp
 import com.devson.nvplayer.R
 
 @Composable
-fun BoxScope.SelectionCheckmarkOverlay(visible: Boolean = true) {
+fun BoxScope.SelectionCheckmarkOverlay() {
+    SelectionCheckmarkOverlay(visible = true)
+}
+
+@Composable
+fun BoxScope.SelectionCheckmarkOverlay(visible: Boolean) {
     val scale by animateFloatAsState(
         targetValue  = if (visible) 1f else 0f,
         animationSpec = spring(

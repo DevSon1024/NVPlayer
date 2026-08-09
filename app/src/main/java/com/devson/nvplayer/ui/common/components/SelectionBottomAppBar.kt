@@ -198,8 +198,22 @@ fun SelectionBottomAppBar(
 private fun ActionColumn(
     icon: ImageVector,
     label: String,
+    onClick: () -> Unit
+) {
+    ActionColumn(
+        icon = icon,
+        label = label,
+        onClick = onClick,
+        modifier = Modifier
+    )
+}
+
+@Composable
+private fun ActionColumn(
+    icon: ImageVector,
+    label: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

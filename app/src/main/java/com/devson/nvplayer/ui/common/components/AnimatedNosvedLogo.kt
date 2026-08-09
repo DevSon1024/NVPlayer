@@ -109,6 +109,33 @@ private fun tipPosition(path: Path, progress: Float): Offset? {
 private fun stageProgress(overall: Float, start: Float, end: Float): Float =
     ((overall - start) / (end - start)).coerceIn(0f, 1f)
 
+@Composable
+fun AnimatedNosvedLogo() {
+    AnimatedNosvedLogo(
+        modifier = Modifier,
+        color = MaterialTheme.colorScheme.primary,
+        animateOnEntry = true
+    )
+}
+
+@Composable
+fun AnimatedNosvedLogo(modifier: Modifier) {
+    AnimatedNosvedLogo(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.primary,
+        animateOnEntry = true
+    )
+}
+
+@Composable
+fun AnimatedNosvedLogo(modifier: Modifier, color: Color) {
+    AnimatedNosvedLogo(
+        modifier = modifier,
+        color = color,
+        animateOnEntry = true
+    )
+}
+
 /**
  * Animated Nosved logo: draws the mark on stroke-by-stroke like a pen (outer
  * silhouette, then the hollow bars, then the play triangle), then solidifies
@@ -117,9 +144,9 @@ private fun stageProgress(overall: Float, start: Float, end: Float): Float =
  */
 @Composable
 fun AnimatedNosvedLogo(
-    modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.primary,
-    animateOnEntry: Boolean = true
+    modifier: Modifier,
+    color: Color,
+    animateOnEntry: Boolean
 ) {
     var hasAnimated by rememberSaveable { mutableStateOf(!animateOnEntry) }
 
