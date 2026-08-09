@@ -24,6 +24,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+data class FileOperationState(
+    val isOperating: Boolean = false,
+    val title: String = "",
+    val currentFileName: String = "",
+    val overallProgress: Float = 0f,
+    val fileProgressPercentage: Int = 0,
+    val isMove: Boolean = true,
+    val isCancelled: Boolean = false
+)
+
 /**
  * Tracks which file action is waiting for a system permission grant (IntentSender result).
  */
@@ -31,6 +41,8 @@ sealed class PendingFileAction {
     data class Delete(val uris: List<Uri>, val trash: Boolean = false) : PendingFileAction()
     data class Restore(val uris: List<Uri>) : PendingFileAction()
     data class Rename(val uri: Uri, val newName: String) : PendingFileAction()
+    data class Move(val videos: List<VideoItem>, val destRelativePath: String) : PendingFileAction()
+    data class Copy(val videos: List<VideoItem>, val destRelativePath: String) : PendingFileAction()
 }
 
 /**
@@ -41,6 +53,16 @@ class FileOperationsViewModel(application: Application) : AndroidViewModel(appli
 
     private val _operationInProgress = MutableStateFlow(false)
     val operationInProgress: StateFlow<Boolean> = _operationInProgress.asStateFlow()
+
+    private val _operationState = MutableStateFlow(FileOperationState())
+    val operationState: StateFlow<FileOperationState> = _operationState.asStateFlow()
+
+    @Volatile
+    private var cancelRequested = false
+
+    fun cancelCurrentOperation() {
+        cancelRequested = true
+    }
 
     /** Non-null = show this message as a Toast then clear. */
     private val _operationResult = MutableStateFlow<String?>(null)
@@ -90,42 +112,69 @@ class FileOperationsViewModel(application: Application) : AndroidViewModel(appli
             }
         }
 
+        cancelRequested = false
         viewModelScope.launch {
             _isTransferring.value = true
             _operationInProgress.value = true
-            val pendingDeletions = mutableListOf<Uri>()
             var successCount = 0
             var failCount = 0
-            try {
-                for (video in videos) {
-                    _transferringFileName.value = video.title
-                    _transferPercentage.value = 0
-                    val result = FileTransferOps.moveVideoScoped(context, video, destRelativePath, overwrite) { progress ->
+            val total = videos.size
+
+            for ((index, video) in videos.withIndex()) {
+                if (cancelRequested) break
+
+                _transferringFileName.value = video.title
+                _transferPercentage.value = 0
+
+                _operationState.value = FileOperationState(
+                    isOperating = true,
+                    title = "Moving ${index + 1} of $total file${if (total != 1) "s" else ""}...",
+                    currentFileName = video.title,
+                    overallProgress = index.toFloat() / total,
+                    fileProgressPercentage = 0,
+                    isMove = true
+                )
+
+                try {
+                    val result = FileTransferOps.moveVideoScoped(
+                        context = context,
+                        sourceVideo = video,
+                        destRelativePath = destRelativePath,
+                        overwrite = overwrite,
+                        isCancelled = { cancelRequested }
+                    ) { progress ->
                         _transferPercentage.value = progress
+                        _operationState.value = _operationState.value.copy(
+                            fileProgressPercentage = progress
+                        )
                     }
                     if (result.isSuccess) {
-                        val moveResult = result.getOrThrow()
-                        if (!moveResult.wasDirectMove) {
-                            pendingDeletions.add(video.uri)
-                        }
                         successCount++
                     } else {
                         failCount++
                     }
+                } catch (e: android.app.RecoverableSecurityException) {
+                    pendingAction = PendingFileAction.Move(videos.drop(index), destRelativePath)
+                    _pendingIntentSender.value = e.userAction.actionIntent.intentSender
+                    break
+                } catch (e: Exception) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && e is SecurityException) {
+                        val intentSender = MediaStore.createWriteRequest(context.contentResolver, listOf(video.uri)).intentSender
+                        pendingAction = PendingFileAction.Move(videos.drop(index), destRelativePath)
+                        _pendingIntentSender.value = intentSender
+                        break
+                    }
+                    failCount++
                 }
-                if (pendingDeletions.isNotEmpty()) {
-                    _pendingDeletionsFlow.emit(pendingDeletions)
-                }
-                _operationResult.value = buildOpResult("Moved", successCount, failCount)
-            } catch (e: Exception) {
-                _operationResult.value = "Move failed: ${e.localizedMessage}"
-            } finally {
-                _isTransferring.value = false
-                _transferringFileName.value = null
-                _transferPercentage.value = 0
-                _operationInProgress.value = false
-                _needsRefresh.value = true
             }
+
+            _operationResult.value = if (cancelRequested) "Move cancelled" else buildOpResult("Moved", successCount, failCount)
+            _isTransferring.value = false
+            _transferringFileName.value = null
+            _transferPercentage.value = 0
+            _operationInProgress.value = false
+            _operationState.value = FileOperationState(isOperating = false)
+            _needsRefresh.value = true
         }
     }
 
@@ -147,34 +196,58 @@ class FileOperationsViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun copyVideos(context: Context, videos: List<VideoItem>, destRelativePath: String) {
+        cancelRequested = false
         viewModelScope.launch {
             _isTransferring.value = true
             _operationInProgress.value = true
             var successCount = 0
             var failCount = 0
-            try {
-                for (video in videos) {
-                    _transferringFileName.value = video.title
-                    _transferPercentage.value = 0
-                    val result = FileTransferOps.copyVideoScoped(context, video, destRelativePath, overwrite = false) { progress ->
+            val total = videos.size
+
+            for ((index, video) in videos.withIndex()) {
+                if (cancelRequested) break
+
+                _transferringFileName.value = video.title
+                _transferPercentage.value = 0
+
+                _operationState.value = FileOperationState(
+                    isOperating = true,
+                    title = "Copying ${index + 1} of $total file${if (total != 1) "s" else ""}...",
+                    currentFileName = video.title,
+                    overallProgress = index.toFloat() / total,
+                    fileProgressPercentage = 0,
+                    isMove = false
+                )
+
+                try {
+                    val result = FileTransferOps.copyVideoScoped(
+                        context = context,
+                        sourceVideo = video,
+                        destRelativePath = destRelativePath,
+                        overwrite = false,
+                        isCancelled = { cancelRequested }
+                    ) { progress ->
                         _transferPercentage.value = progress
+                        _operationState.value = _operationState.value.copy(
+                            fileProgressPercentage = progress
+                        )
                     }
                     if (result.isSuccess) {
                         successCount++
                     } else {
                         failCount++
                     }
+                } catch (e: Exception) {
+                    failCount++
                 }
-                _operationResult.value = buildOpResult("Copied", successCount, failCount)
-            } catch (e: Exception) {
-                _operationResult.value = "Copy failed: ${e.localizedMessage}"
-            } finally {
-                _isTransferring.value = false
-                _transferringFileName.value = null
-                _transferPercentage.value = 0
-                _operationInProgress.value = false
-                _needsRefresh.value = true
             }
+            _operationResult.value = if (cancelRequested) "Copy cancelled" else buildOpResult("Copied", successCount, failCount)
+            _isTransferring.value = false
+            _transferringFileName.value = null
+            _transferPercentage.value = 0
+            _operationInProgress.value = false
+            _operationState.value = FileOperationState(isOperating = false)
+            _needsRefresh.value = true
         }
     }
 
@@ -241,10 +314,18 @@ class FileOperationsViewModel(application: Application) : AndroidViewModel(appli
 
     /** Single entry point called by the screen on any RESULT_OK from the IntentSender launcher. */
     fun onPermissionGranted(context: Context) {
-        when (pendingAction) {
+        when (val action = pendingAction) {
             is PendingFileAction.Delete -> onDeletePermissionGranted(context)
             is PendingFileAction.Restore -> onRestorePermissionGranted(context)
             is PendingFileAction.Rename -> onRenamePermissionGranted(context)
+            is PendingFileAction.Move -> {
+                pendingAction = null
+                moveVideos(context, action.videos, action.destRelativePath, overwrite = true)
+            }
+            is PendingFileAction.Copy -> {
+                pendingAction = null
+                copyVideos(context, action.videos, action.destRelativePath)
+            }
             null -> {}
         }
     }

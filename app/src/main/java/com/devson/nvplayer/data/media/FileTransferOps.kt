@@ -14,6 +14,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.util.concurrent.CancellationException
 
 object FileTransferOps {
 
@@ -82,11 +83,26 @@ object FileTransferOps {
         }
     }
 
+    /**
+     * Checks if the source file and target destination directory reside on the same storage volume.
+     */
+    fun isSameVolume(sourcePath: String, destRelativePath: String): Boolean {
+        val extDir = android.os.Environment.getExternalStorageDirectory().absolutePath
+        val destDir = File(extDir, destRelativePath).absolutePath
+        return sourcePath.startsWith(extDir) && destDir.startsWith(extDir)
+    }
+
+    /**
+     * Smart File Move Strategy:
+     * - Same Volume: Uses atomic MediaStore RELATIVE_PATH update or direct renameTo.
+     * - Cross Volume: Stream copy with rollback on failure, followed by silent source deletion under the same move state.
+     */
     suspend fun moveVideoScoped(
         context: Context,
         sourceVideo: VideoItem,
         destRelativePath: String,
         overwrite: Boolean = false,
+        isCancelled: () -> Boolean = { false },
         onProgress: (percent: Int) -> Unit = {}
     ): Result<MoveResult> = withContext(Dispatchers.IO) {
         runCatching {
@@ -98,7 +114,7 @@ object FileTransferOps {
             }
             val destFile = File(destDir, sourceFile.name)
 
-            // If source and destination paths are identical, do nothing (success)
+            // If source and destination paths are identical, return immediately
             if (sourceFile.absolutePath == destFile.absolutePath) {
                 onProgress(100)
                 return@withContext Result.success(MoveResult(destFile.absolutePath, true))
@@ -115,7 +131,7 @@ object FileTransferOps {
                 }
             }
 
-            // Android 10+: Try updating MediaStore RELATIVE_PATH directly (O(1) move)
+            // 1. Android 10+: Try updating MediaStore RELATIVE_PATH directly (Atomic instant move on same volume)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 try {
                     val values = ContentValues().apply {
@@ -138,41 +154,54 @@ object FileTransferOps {
                         }
                     }
                 } catch (e: Exception) {
-                    Log.d("FileTransferOps", "MediaStore direct RELATIVE_PATH update move failed: ${e.localizedMessage}")
+                    if (e is SecurityException) {
+                        throw e // Rethrow SecurityException for permission dialogs
+                    }
+                    Log.d("FileTransferOps", "MediaStore direct RELATIVE_PATH update failed: ${e.localizedMessage}")
                 }
             }
 
+            // 2. Try direct file rename on same file system
             if (tryDirectMove(sourceFile, destFile)) {
                 triggerMediaScanFast(context, destFile.absolutePath)
                 try {
                     context.contentResolver.delete(sourceVideo.uri, null, null)
                 } catch (e: Exception) {
-                    Log.w("FileTransferOps", "Failed to delete source URI from MediaStore: ${e.localizedMessage}")
+                    Log.w("FileTransferOps", "Failed to delete source URI: ${e.localizedMessage}")
                 }
                 triggerMediaScanFast(context, sourceFile.absolutePath)
                 onProgress(100)
-                MoveResult(destFile.absolutePath, true)
-            } else {
-                val copyResult = copyVideoScoped(context, sourceVideo, destRelativePath, overwrite, onProgress)
-                val destPath = copyResult.getOrThrow()
-                
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                    // Pre-Q: delete directly, then remove MediaStore row
-                    if (sourceFile.exists()) {
-                        sourceFile.delete()
-                    }
-                    try {
-                        context.contentResolver.delete(sourceVideo.uri, null, null)
-                    } catch (e: Exception) {
-                        Log.w("FileTransferOps", "Failed to delete source URI: ${e.localizedMessage}")
-                    }
-                    triggerMediaScanFast(context, sourceFile.absolutePath)
-                    MoveResult(destPath, true)
-                } else {
-                    // Q+: cannot delete directly, so we delegate deletion to the UI/VM
-                    MoveResult(destPath, false)
-                }
+                return@withContext Result.success(MoveResult(destFile.absolutePath, true))
             }
+
+            // 3. Cross Volume Fallback: Stream copy with rollback on failure + silent source deletion
+            val copyResult = copyVideoScoped(
+                context = context,
+                sourceVideo = sourceVideo,
+                destRelativePath = destRelativePath,
+                overwrite = overwrite,
+                isCancelled = isCancelled,
+                onProgress = onProgress
+            )
+
+            if (copyResult.isFailure) {
+                throw copyResult.exceptionOrNull() ?: Exception("Cross-volume copy failed")
+            }
+
+            val destPath = copyResult.getOrThrow()
+
+            // Delete source file after successful copy
+            if (sourceFile.exists()) {
+                sourceFile.delete()
+            }
+            try {
+                context.contentResolver.delete(sourceVideo.uri, null, null)
+            } catch (e: Exception) {
+                Log.w("FileTransferOps", "Failed to delete source URI: ${e.localizedMessage}")
+            }
+            triggerMediaScanFast(context, sourceFile.absolutePath)
+
+            MoveResult(destPath, true)
         }
     }
 
@@ -181,6 +210,7 @@ object FileTransferOps {
         sourceVideo: VideoItem,
         destRelativePath: String,
         overwrite: Boolean = false,
+        isCancelled: () -> Boolean = { false },
         onProgress: (percent: Int) -> Unit = {}
     ): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
@@ -189,7 +219,6 @@ object FileTransferOps {
             val destDir = File(extDir, destRelativePath)
             val destFile = File(destDir, sourceFile.name)
 
-            // If source and destination paths are identical, do nothing (success)
             if (sourceFile.absolutePath == destFile.absolutePath) {
                 onProgress(100)
                 return@withContext Result.success(destFile.absolutePath)
@@ -232,8 +261,12 @@ object FileTransferOps {
                                 FileOutputStream(destPfd.fileDescriptor).channel.use { destChannel ->
                                     val size = srcChannel.size()
                                     var transferred = 0L
+                                    val bufferSize = 64 * 1024L
                                     while (transferred < size) {
-                                        val count = srcChannel.transferTo(transferred, size - transferred, destChannel)
+                                        if (isCancelled()) {
+                                            throw CancellationException("Operation cancelled by user")
+                                        }
+                                        val count = srcChannel.transferTo(transferred, bufferSize.coerceAtMost(size - transferred), destChannel)
                                         if (count <= 0) break
                                         transferred += count
                                         if (size > 0) {
@@ -244,6 +277,10 @@ object FileTransferOps {
                                 }
                             }
                         }
+                    }
+
+                    if (isCancelled()) {
+                        throw CancellationException("Operation cancelled by user")
                     }
 
                     val updatedValues = ContentValues().apply {
@@ -267,39 +304,50 @@ object FileTransferOps {
                     triggerMediaScanFast(context, absolutePath)
                     absolutePath
                 } catch (e: Exception) {
-                    resolver.delete(destUri, null, null)
+                    // ROLLBACK: Remove incomplete destination file
+                    try { resolver.delete(destUri, null, null) } catch (_: Exception) {}
                     throw e
                 }
             } else {
-                // Pre-Q (legacy storage API)
+                // Pre-Q legacy API
                 if (!destDir.exists()) {
                     destDir.mkdirs()
                 }
 
-                FileInputStream(sourceFile).channel.use { srcChannel ->
-                    FileOutputStream(destFile).channel.use { destChannel ->
-                        val size = srcChannel.size()
-                        var transferred = 0L
-                        while (transferred < size) {
-                            val count = srcChannel.transferTo(transferred, size - transferred, destChannel)
-                            if (count <= 0) break
-                            transferred += count
-                            if (size > 0) {
-                                val progress = ((transferred * 100) / size).toInt()
-                                onProgress(progress.coerceIn(0, 100))
+                try {
+                    FileInputStream(sourceFile).channel.use { srcChannel ->
+                        FileOutputStream(destFile).channel.use { destChannel ->
+                            val size = srcChannel.size()
+                            var transferred = 0L
+                            val bufferSize = 64 * 1024L
+                            while (transferred < size) {
+                                if (isCancelled()) {
+                                    throw CancellationException("Operation cancelled by user")
+                                }
+                                val count = srcChannel.transferTo(transferred, bufferSize.coerceAtMost(size - transferred), destChannel)
+                                if (count <= 0) break
+                                transferred += count
+                                if (size > 0) {
+                                    val progress = ((transferred * 100) / size).toInt()
+                                    onProgress(progress.coerceIn(0, 100))
+                                }
                             }
                         }
                     }
-                }
 
-                val values = ContentValues().apply {
-                    put(MediaStore.Video.Media.DISPLAY_NAME, sourceFile.name)
-                    put(MediaStore.Video.Media.MIME_TYPE, mimeType)
-                    put(MediaStore.Video.Media.DATA, destFile.absolutePath)
+                    val values = ContentValues().apply {
+                        put(MediaStore.Video.Media.DISPLAY_NAME, sourceFile.name)
+                        put(MediaStore.Video.Media.MIME_TYPE, mimeType)
+                        put(MediaStore.Video.Media.DATA, destFile.absolutePath)
+                    }
+                    resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                    triggerMediaScanFast(context, destFile.absolutePath)
+                    destFile.absolutePath
+                } catch (e: Exception) {
+                    // ROLLBACK: Remove incomplete destination file
+                    if (destFile.exists()) destFile.delete()
+                    throw e
                 }
-                resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-                triggerMediaScanFast(context, destFile.absolutePath)
-                destFile.absolutePath
             }
         }
     }
@@ -309,6 +357,7 @@ object FileTransferOps {
         sourceVideo: VideoItem,
         destTreeUri: Uri,
         overwrite: Boolean = false,
+        isCancelled: () -> Boolean = { false },
         onProgress: (percent: Int) -> Unit = {}
     ): Result<Uri> = withContext(Dispatchers.IO) {
         runCatching {
@@ -335,24 +384,34 @@ object FileTransferOps {
 
             val destFileUri = newFile.uri
 
-            resolver.openFileDescriptor(sourceVideo.uri, "r")?.use { srcPfd ->
-                FileInputStream(srcPfd.fileDescriptor).channel.use { srcChannel ->
-                    resolver.openFileDescriptor(destFileUri, "w")?.use { destPfd ->
-                        FileOutputStream(destPfd.fileDescriptor).channel.use { destChannel ->
-                            val size = srcChannel.size()
-                            var transferred = 0L
-                            while (transferred < size) {
-                                val count = srcChannel.transferTo(transferred, size - transferred, destChannel)
-                                if (count <= 0) break
-                                transferred += count
-                                if (size > 0) {
-                                    val progress = ((transferred * 100) / size).toInt()
-                                    onProgress(progress.coerceIn(0, 100))
+            try {
+                resolver.openFileDescriptor(sourceVideo.uri, "r")?.use { srcPfd ->
+                    FileInputStream(srcPfd.fileDescriptor).channel.use { srcChannel ->
+                        resolver.openFileDescriptor(destFileUri, "w")?.use { destPfd ->
+                            FileOutputStream(destPfd.fileDescriptor).channel.use { destChannel ->
+                                val size = srcChannel.size()
+                                var transferred = 0L
+                                val bufferSize = 64 * 1024L
+                                while (transferred < size) {
+                                    if (isCancelled()) {
+                                        throw CancellationException("Operation cancelled by user")
+                                    }
+                                    val count = srcChannel.transferTo(transferred, bufferSize.coerceAtMost(size - transferred), destChannel)
+                                    if (count <= 0) break
+                                    transferred += count
+                                    if (size > 0) {
+                                        val progress = ((transferred * 100) / size).toInt()
+                                        onProgress(progress.coerceIn(0, 100))
+                                    }
                                 }
                             }
                         }
                     }
                 }
+            } catch (e: Exception) {
+                // ROLLBACK: Remove incomplete destination file
+                try { newFile.delete() } catch (_: Exception) {}
+                throw e
             }
 
             destFileUri.path?.let { path ->

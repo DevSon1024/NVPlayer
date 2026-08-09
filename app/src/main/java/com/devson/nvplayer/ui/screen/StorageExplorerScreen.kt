@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.devson.nvplayer.ui.components.CustomRenameDialog
+import com.devson.nvplayer.ui.common.components.FileOperationProgressDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -45,9 +46,62 @@ import java.io.File
 
 private data class FileNode(
     val file: File,
+    val name: String,
     val childDirCount: Int,
-    val isDirectory: Boolean
+    val isDirectory: Boolean,
+    val formattedSize: String
 )
+
+private fun loadStorageDirectoryEntries(
+    dir: File,
+    operationType: String,
+    allowedExtensions: List<String>
+): List<FileNode> {
+    val allowedExtSet = allowedExtensions.map { 
+        val ext = it.lowercase()
+        if (ext.startsWith(".")) ext else ".$ext"
+    }.toSet()
+
+    val rawFiles = dir.listFiles { file ->
+        val name = file.name
+        if (name.startsWith(".")) false
+        else if (file.isDirectory) true
+        else if (operationType == "SELECT_FILE") {
+            val ext = "." + name.substringAfterLast('.', "").lowercase()
+            allowedExtSet.contains(ext)
+        } else false
+    } ?: emptyArray()
+
+    rawFiles.sortWith(compareByDescending<File> { it.isDirectory }.thenBy { it.name.lowercase() })
+
+    return rawFiles.map { file ->
+        val name = file.name
+        if (file.isDirectory) {
+            val childCount = file.listFiles(java.io.FileFilter { f -> f.isDirectory && !f.name.startsWith(".") })?.size ?: 0
+            FileNode(
+                file = file,
+                name = name,
+                childDirCount = childCount,
+                isDirectory = true,
+                formattedSize = ""
+            )
+        } else {
+            val bytes = file.length()
+            val sizeStr = when {
+                bytes < 1024 -> "$bytes B"
+                bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+                else -> "%.2f MB".format(bytes / (1024.0 * 1024.0))
+            }
+            FileNode(
+                file = file,
+                name = name,
+                childDirCount = 0,
+                isDirectory = false,
+                formattedSize = sizeStr
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,24 +141,7 @@ fun StorageExplorerScreen(
     LaunchedEffect(currentDir) {
         isLoading = true
         entries = withContext(Dispatchers.IO) {
-            (currentDir.listFiles() ?: emptyArray())
-                .filter { file ->
-                    if (file.name.startsWith(".")) return@filter false
-                    if (file.isDirectory) true
-                    else if (operationType == "SELECT_FILE") {
-                        val ext = "." + file.name.substringAfterLast('.', "").lowercase()
-                        allowedExtensions.map { it.lowercase() }.contains(ext)
-                    } else false
-                }
-                .sortedWith(compareByDescending<File> { it.isDirectory }.thenBy { it.name.lowercase() })
-                .map { file ->
-                    if (file.isDirectory) {
-                        val childCount = file.listFiles()?.count { it.isDirectory } ?: 0
-                        FileNode(file = file, childDirCount = childCount, isDirectory = true)
-                    } else {
-                        FileNode(file = file, childDirCount = 0, isDirectory = false)
-                    }
-                }
+            loadStorageDirectoryEntries(currentDir, operationType, allowedExtensions)
         }
         isLoading = false
     }
@@ -159,24 +196,7 @@ fun StorageExplorerScreen(
                     showNewFolderDialog = false
                     coroutineScope.launch {
                         entries = withContext(Dispatchers.IO) {
-                            (currentDir.listFiles() ?: emptyArray())
-                                .filter { file ->
-                                    if (file.name.startsWith(".")) return@filter false
-                                    if (file.isDirectory) true
-                                    else if (operationType == "SELECT_FILE") {
-                                        val ext = "." + file.name.substringAfterLast('.', "").lowercase()
-                                        allowedExtensions.map { it.lowercase() }.contains(ext)
-                                    } else false
-                                }
-                                .sortedWith(compareByDescending<File> { it.isDirectory }.thenBy { it.name.lowercase() })
-                                .map { file ->
-                                    if (file.isDirectory) {
-                                        val childCount = file.listFiles()?.count { it.isDirectory } ?: 0
-                                        FileNode(file = file, childDirCount = childCount, isDirectory = true)
-                                    } else {
-                                        FileNode(file = file, childDirCount = 0, isDirectory = false)
-                                    }
-                                }
+                            loadStorageDirectoryEntries(currentDir, operationType, allowedExtensions)
                         }
                     }
                 } else {
@@ -527,46 +547,11 @@ fun StorageExplorerScreen(
                 }
             }
 
-            // Processing overlay
-            AnimatedVisibility(
-                visible = isProcessing,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    ElevatedCard(
-                        shape = RoundedCornerShape(20.dp),
-                        modifier = Modifier.padding(32.dp)
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.padding(horizontal = 40.dp, vertical = 32.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(44.dp),
-                                strokeWidth = 3.5.dp
-                            )
-                            Text(
-                                text = if (operationType == "MOVE") "Moving…" else "Copying…",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "${sourceUris.size} file(s)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
+            val opState by fileOpsViewModel.operationState.collectAsState()
+            FileOperationProgressDialog(
+                state = opState,
+                onCancel = { fileOpsViewModel.cancelCurrentOperation() }
+            )
         }
     }
 }
@@ -618,7 +603,7 @@ private fun ExplorerFolderRow(
 
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = node.file.name,
+                    text = node.name,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
@@ -681,20 +666,14 @@ private fun ExplorerFileRow(
 
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = node.file.name,
+                    text = node.name,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                val sizeStr = remember(node.file) {
-                    val bytes = node.file.length()
-                    if (bytes < 1024) "$bytes B"
-                    else if (bytes < 1024 * 1024) "${bytes / 1024} KB"
-                    else "%.2f MB".format(bytes / (1024.0 * 1024.0))
-                }
                 Text(
-                    text = sizeStr,
+                    text = node.formattedSize,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
