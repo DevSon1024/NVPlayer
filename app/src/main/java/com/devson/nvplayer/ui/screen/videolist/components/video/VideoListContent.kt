@@ -24,7 +24,9 @@ import com.devson.nvplayer.domain.model.LayoutMode
 import com.devson.nvplayer.domain.model.Video
 import com.devson.nvplayer.domain.model.ViewSettings
 import com.devson.nvplayer.domain.model.WatchHistory
+import com.devson.nvplayer.domain.model.getSectionLabel
 import com.devson.nvplayer.ui.common.components.CustomEmptyStateView
+import com.devson.nvplayer.ui.common.components.FastScrollerOverlay
 
 @Composable
 fun VideoListContent(
@@ -53,73 +55,86 @@ fun VideoListContent(
         }
         return
     }
-    if (settings.layoutMode == LayoutMode.GRID) {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(settings.gridColumns),
-            state = gridState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 8.dp,
-                end = 8.dp,
-                top = contentPadding.calculateTopPadding() + 8.dp,
-                bottom = contentPadding.calculateBottomPadding() + 8.dp
-            ),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(
-                items = videos,
-                key = { video -> video.uri },
-                contentType = { "video_item" }
-            ) { video ->
-                val onClick = remember(video) { { _: Video -> currentOnVideoClick(video) } }
-                val onLongClick = remember(video) { { _: Video -> currentOnVideoLongClick(video) } }
-                VideoGridItem(
-                    video = video,
-                    settings = settings,
-                    isSelected = video in selectedVideos,
-                    lastPositionMs = historyMap[video.uri]?.lastPositionMs ?: 0L,
-                    onClick = onClick,
-                    onLongClick = onLongClick
-                )
-            }
-        }
-    } else {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                top = contentPadding.calculateTopPadding(),
-                bottom = contentPadding.calculateBottomPadding() + 16.dp
-            )
-        ) {
-            items(
-                items = videos,
-                key = { video -> video.uri },
-                contentType = { "video_item" }
-            ) { video ->
-                val onClick = remember(video) { { _: Video -> currentOnVideoClick(video) } }
-                val onLongClick = remember(video) { { _: Video -> currentOnVideoLongClick(video) } }
-                val onInfo = remember(video) {
-                    if (onInfoClick != null) {
-                        {
-                            currentOnInfoClick?.invoke(video)
-                            Unit
-                        }
-                    } else {
-                        null
-                    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (settings.layoutMode == LayoutMode.GRID) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(settings.gridColumns),
+                state = gridState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 8.dp,
+                    end = 8.dp,
+                    top = contentPadding.calculateTopPadding() + 8.dp,
+                    bottom = contentPadding.calculateBottomPadding() + 8.dp
+                ),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    items = videos,
+                    key = { video -> video.uri },
+                    contentType = { "video_item" }
+                ) { video ->
+                    val onClick = remember(video) { { _: Video -> currentOnVideoClick(video) } }
+                    val onLongClick = remember(video) { { _: Video -> currentOnVideoLongClick(video) } }
+                    VideoGridItem(
+                        video = video,
+                        settings = settings,
+                        isSelected = video in selectedVideos,
+                        lastPositionMs = historyMap[video.uri]?.lastPositionMs ?: 0L,
+                        onClick = onClick,
+                        onLongClick = onLongClick
+                    )
                 }
-                VideoListItem(
-                    video = video,
-                    settings = settings,
-                    isSelected = video in selectedVideos,
-                    lastPositionMs = historyMap[video.uri]?.lastPositionMs ?: 0L,
-                    onClick = onClick,
-                    onLongClick = onLongClick,
-                    onInfoClick = onInfo
+            }
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = contentPadding.calculateTopPadding(),
+                    bottom = contentPadding.calculateBottomPadding() + 16.dp
                 )
+            ) {
+                items(
+                    items = videos,
+                    key = { video -> video.uri },
+                    contentType = { "video_item" }
+                ) { video ->
+                    val onClick = remember(video) { { _: Video -> currentOnVideoClick(video) } }
+                    val onLongClick = remember(video) { { _: Video -> currentOnVideoLongClick(video) } }
+                    val onInfo = remember(video) {
+                        if (onInfoClick != null) {
+                            {
+                                currentOnInfoClick?.invoke(video)
+                                Unit
+                            }
+                        } else {
+                            null
+                        }
+                    }
+                    VideoListItem(
+                        video = video,
+                        settings = settings,
+                        isSelected = video in selectedVideos,
+                        lastPositionMs = historyMap[video.uri]?.lastPositionMs ?: 0L,
+                        onClick = onClick,
+                        onLongClick = onLongClick,
+                        onInfoClick = onInfo
+                    )
+                }
             }
         }
+
+        FastScrollerOverlay(
+            itemCount = videos.size,
+            sectionTextExtractor = { index ->
+                videos.getOrNull(index)?.getSectionLabel(settings.sortField) ?: ""
+            },
+            listState = if (settings.layoutMode == LayoutMode.GRID) null else listState,
+            gridState = if (settings.layoutMode == LayoutMode.GRID) gridState else null,
+            topPadding = contentPadding.calculateTopPadding(),
+            bottomPadding = contentPadding.calculateBottomPadding()
+        )
     }
 }

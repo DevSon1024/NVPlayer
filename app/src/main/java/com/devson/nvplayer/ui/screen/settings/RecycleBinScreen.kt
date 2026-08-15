@@ -13,6 +13,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -36,7 +37,10 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.devson.nvplayer.R
+import com.devson.nvplayer.domain.model.SortField
 import com.devson.nvplayer.domain.model.Video
+import com.devson.nvplayer.domain.model.getSectionLabel
+import com.devson.nvplayer.ui.common.components.FastScrollerOverlay
 import com.devson.nvplayer.util.formatDate
 import com.devson.nvplayer.util.formatSize
 import com.devson.nvplayer.viewmodel.FileOperationsViewModel
@@ -215,50 +219,64 @@ fun RecycleBinScreen(
                     )
                 }
             } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = padding.calculateTopPadding() + 16.dp,
-                        bottom = padding.calculateBottomPadding() + 32.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(
-                        items = trashedVideos,
-                        key = { it.uri },
-                        contentType = { "trashed_video" }
-                    ) { video ->
-                        val isSelected = selectedVideos.contains(video)
-                        val onLongClick = remember(video, isSelected) {
-                            {
-                                selectedVideos = if (isSelected) {
-                                    selectedVideos - video
-                                } else {
-                                    selectedVideos + video
-                                }
-                            }
-                        }
-                        val onClick = remember(video, isSelected, isSelectionActive) {
-                            {
-                                if (isSelectionActive) {
+                val listState = rememberLazyListState()
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state = listState,
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = padding.calculateTopPadding() + 16.dp,
+                            bottom = padding.calculateBottomPadding() + 32.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(
+                            items = trashedVideos,
+                            key = { it.uri },
+                            contentType = { "trashed_video" }
+                        ) { video ->
+                            val isSelected = selectedVideos.contains(video)
+                            val onLongClick = remember(video, isSelected) {
+                                {
                                     selectedVideos = if (isSelected) {
                                         selectedVideos - video
                                     } else {
                                         selectedVideos + video
                                     }
-                                } else {
-                                    Toast.makeText(context, context.getString(R.string.recycle_bin_select_prompt), Toast.LENGTH_SHORT).show()
                                 }
                             }
+                            val onClick = remember(video, isSelected, isSelectionActive) {
+                                {
+                                    if (isSelectionActive) {
+                                        selectedVideos = if (isSelected) {
+                                            selectedVideos - video
+                                        } else {
+                                            selectedVideos + video
+                                        }
+                                    } else {
+                                        Toast.makeText(context, context.getString(R.string.recycle_bin_select_prompt), Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                            TrashedVideoItem(
+                                video = video,
+                                isSelected = isSelected,
+                                onLongClick = onLongClick,
+                                onClick = onClick
+                            )
                         }
-                        TrashedVideoItem(
-                            video = video,
-                            isSelected = isSelected,
-                            onLongClick = onLongClick,
-                            onClick = onClick
-                        )
                     }
+
+                    FastScrollerOverlay(
+                        itemCount = trashedVideos.size,
+                        sectionTextExtractor = { index ->
+                            trashedVideos.getOrNull(index)?.getSectionLabel(SortField.DATE) ?: ""
+                        },
+                        listState = listState,
+                        topPadding = padding.calculateTopPadding(),
+                        bottomPadding = padding.calculateBottomPadding()
+                    )
                 }
             }
         }

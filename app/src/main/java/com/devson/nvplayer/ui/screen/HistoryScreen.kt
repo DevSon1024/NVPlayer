@@ -9,9 +9,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,7 +36,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.devson.nvplayer.R
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.devson.nvplayer.domain.model.SortField
 import com.devson.nvplayer.domain.model.Video
+import com.devson.nvplayer.domain.model.getSectionLabel
+import com.devson.nvplayer.ui.common.components.FastScrollerOverlay
 import com.devson.nvplayer.ui.screen.videolist.components.common.WatchProgressBar
 import com.devson.nvplayer.ui.screen.videolist.components.video.VideoThumbnail
 import com.devson.nvplayer.ui.screens.videolist.utils.shareVideos
@@ -210,89 +215,106 @@ fun HistoryScreen(
         } else {
             val playlist = remember(historyVideos) { historyVideos }
             val historyMap = remember(history) { history.associateBy { it.uri } }
+            val listState = rememberLazyListState()
+            val gridState = rememberLazyGridState()
 
-            if (!isGridView) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        top = padding.calculateTopPadding() + 8.dp,
-                        bottom = padding.calculateBottomPadding() + 32.dp,
-                        start = 12.dp,
-                        end = 12.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(
-                        items = historyVideos,
-                        key = { it.uri }
-                    ) { video ->
-                        val historyEntry = historyMap[video.uri]
-                        val lastPositionMs = historyEntry?.lastPositionMs ?: 0L
-                        val isSelected = video.uri in selectedUris
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (!isGridView) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            top = padding.calculateTopPadding() + 8.dp,
+                            bottom = padding.calculateBottomPadding() + 32.dp,
+                            start = 12.dp,
+                            end = 12.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(
+                            items = historyVideos,
+                            key = { it.uri }
+                        ) { video ->
+                            val historyEntry = historyMap[video.uri]
+                            val lastPositionMs = historyEntry?.lastPositionMs ?: 0L
+                            val isSelected = video.uri in selectedUris
 
-                        HistoryListItem(
-                            video = video,
-                            lastPositionMs = lastPositionMs,
-                            isSelected = isSelected,
-                            isSelectionMode = isSelectionMode,
-                            onClick = {
-                                if (isSelectionMode) {
+                            HistoryListItem(
+                                video = video,
+                                lastPositionMs = lastPositionMs,
+                                isSelected = isSelected,
+                                isSelectionMode = isSelectionMode,
+                                onClick = {
+                                    if (isSelectionMode) {
+                                        selectedUris = if (isSelected) selectedUris - video.uri else selectedUris + video.uri
+                                    } else {
+                                        onVideoSelected(video, playlist, lastPositionMs)
+                                    }
+                                },
+                                onLongClick = {
                                     selectedUris = if (isSelected) selectedUris - video.uri else selectedUris + video.uri
-                                } else {
-                                    onVideoSelected(video, playlist, lastPositionMs)
-                                }
-                            },
-                            onLongClick = {
-                                selectedUris = if (isSelected) selectedUris - video.uri else selectedUris + video.uri
-                            },
-                            onRemoveClick = { homeViewModel.removeFromHistory(video.uri) },
-                            onShareClick = { shareVideos(context, listOf(video)) },
-                            onInfoClick = { selectedVideoForInfo = video }
-                        )
+                                },
+                                onRemoveClick = { homeViewModel.removeFromHistory(video.uri) },
+                                onShareClick = { shareVideos(context, listOf(video)) },
+                                onInfoClick = { selectedVideoForInfo = video }
+                            )
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        state = gridState,
+                        columns = GridCells.Adaptive(minSize = 160.dp),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            top = padding.calculateTopPadding() + 8.dp,
+                            bottom = padding.calculateBottomPadding() + 32.dp,
+                            start = 12.dp,
+                            end = 12.dp
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(
+                            items = historyVideos,
+                            key = { it.uri }
+                        ) { video ->
+                            val historyEntry = historyMap[video.uri]
+                            val lastPositionMs = historyEntry?.lastPositionMs ?: 0L
+                            val isSelected = video.uri in selectedUris
+
+                            HistoryGridItem(
+                                video = video,
+                                lastPositionMs = lastPositionMs,
+                                isSelected = isSelected,
+                                isSelectionMode = isSelectionMode,
+                                onClick = {
+                                    if (isSelectionMode) {
+                                        selectedUris = if (isSelected) selectedUris - video.uri else selectedUris + video.uri
+                                    } else {
+                                        onVideoSelected(video, playlist, lastPositionMs)
+                                    }
+                                },
+                                onLongClick = {
+                                    selectedUris = if (isSelected) selectedUris - video.uri else selectedUris + video.uri
+                                },
+                                onRemoveClick = { homeViewModel.removeFromHistory(video.uri) },
+                                onShareClick = { shareVideos(context, listOf(video)) },
+                                onInfoClick = { selectedVideoForInfo = video }
+                            )
+                        }
                     }
                 }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 160.dp),
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        top = padding.calculateTopPadding() + 8.dp,
-                        bottom = padding.calculateBottomPadding() + 32.dp,
-                        start = 12.dp,
-                        end = 12.dp
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(
-                        items = historyVideos,
-                        key = { it.uri }
-                    ) { video ->
-                        val historyEntry = historyMap[video.uri]
-                        val lastPositionMs = historyEntry?.lastPositionMs ?: 0L
-                        val isSelected = video.uri in selectedUris
 
-                        HistoryGridItem(
-                            video = video,
-                            lastPositionMs = lastPositionMs,
-                            isSelected = isSelected,
-                            isSelectionMode = isSelectionMode,
-                            onClick = {
-                                if (isSelectionMode) {
-                                    selectedUris = if (isSelected) selectedUris - video.uri else selectedUris + video.uri
-                                } else {
-                                    onVideoSelected(video, playlist, lastPositionMs)
-                                }
-                            },
-                            onLongClick = {
-                                selectedUris = if (isSelected) selectedUris - video.uri else selectedUris + video.uri
-                            },
-                            onRemoveClick = { homeViewModel.removeFromHistory(video.uri) },
-                            onShareClick = { shareVideos(context, listOf(video)) },
-                            onInfoClick = { selectedVideoForInfo = video }
-                        )
-                    }
-                }
+                FastScrollerOverlay(
+                    itemCount = historyVideos.size,
+                    sectionTextExtractor = { index ->
+                        historyVideos.getOrNull(index)?.getSectionLabel(SortField.DATE) ?: ""
+                    },
+                    listState = if (isGridView) null else listState,
+                    gridState = if (isGridView) gridState else null,
+                    topPadding = padding.calculateTopPadding(),
+                    bottomPadding = padding.calculateBottomPadding()
+                )
             }
         }
     }

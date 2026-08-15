@@ -32,7 +32,9 @@ import com.devson.nvplayer.domain.model.Video
 import com.devson.nvplayer.domain.model.VideoFolder
 import com.devson.nvplayer.domain.model.ViewSettings
 import com.devson.nvplayer.domain.model.WatchHistory
+import com.devson.nvplayer.domain.model.getSectionLabel
 import com.devson.nvplayer.ui.common.components.CustomEmptyStateView
+import com.devson.nvplayer.ui.common.components.FastScrollerOverlay
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -64,74 +66,87 @@ fun FolderListContent(
         return
     }
 
-    if (settings.layoutMode == LayoutMode.GRID) {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(settings.gridColumns),
-            state = gridState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 8.dp,
-                top = contentPadding.calculateTopPadding() + 8.dp,
-                end = 8.dp,
-                bottom = contentPadding.calculateBottomPadding() + 40.dp
-            ),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(
-                items = sortedFolders,
-                key = { folder -> folder.id },
-                contentType = { "folder_item" }
-            ) { folder ->
-                val onClick = remember(folder) { { currentOnFolderClick(folder) } }
-                val onLongClick = remember(folder) {
-                    {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        currentOnFolderLongClick(folder)
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (settings.layoutMode == LayoutMode.GRID) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(settings.gridColumns),
+                state = gridState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 8.dp,
+                    top = contentPadding.calculateTopPadding() + 8.dp,
+                    end = 8.dp,
+                    bottom = contentPadding.calculateBottomPadding() + 40.dp
+                ),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    items = sortedFolders,
+                    key = { folder -> folder.id },
+                    contentType = { "folder_item" }
+                ) { folder ->
+                    val onClick = remember(folder) { { currentOnFolderClick(folder) } }
+                    val onLongClick = remember(folder) {
+                        {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            currentOnFolderLongClick(folder)
+                        }
                     }
+                    FolderGridItem(
+                        folder = folder,
+                        videos = folders[folder] ?: emptyList(),
+                        settings = settings,
+                        isSelected = folder in selectedFolders,
+                        historyMap = historyMap,
+                        onClick = onClick,
+                        onLongClick = onLongClick
+                    )
                 }
-                FolderGridItem(
-                    folder = folder,
-                    videos = folders[folder] ?: emptyList(),
-                    settings = settings,
-                    isSelected = folder in selectedFolders,
-                    historyMap = historyMap,
-                    onClick = onClick,
-                    onLongClick = onLongClick
+            }
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = contentPadding.calculateTopPadding(),
+                    bottom = contentPadding.calculateBottomPadding() + 32.dp
                 )
+            ) {
+                items(
+                    items = sortedFolders,
+                    key = { folder -> folder.id },
+                    contentType = { "folder_item" }
+                ) { folder ->
+                    val onClick = remember(folder) { { currentOnFolderClick(folder) } }
+                    val onLongClick = remember(folder) {
+                        {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            currentOnFolderLongClick(folder)
+                        }
+                    }
+                    FolderListItem(
+                        folder = folder,
+                        videos = folders[folder] ?: emptyList(),
+                        settings = settings,
+                        isSelected = folder in selectedFolders,
+                        historyMap = historyMap,
+                        onClick = onClick,
+                        onLongClick = onLongClick
+                    )
+                }
             }
         }
-    } else {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                top = contentPadding.calculateTopPadding(),
-                bottom = contentPadding.calculateBottomPadding() + 32.dp
-            )
-        ) {
-            items(
-                items = sortedFolders,
-                key = { folder -> folder.id },
-                contentType = { "folder_item" }
-            ) { folder ->
-                val onClick = remember(folder) { { currentOnFolderClick(folder) } }
-                val onLongClick = remember(folder) {
-                    {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        currentOnFolderLongClick(folder)
-                    }
-                }
-                FolderListItem(
-                    folder = folder,
-                    videos = folders[folder] ?: emptyList(),
-                    settings = settings,
-                    isSelected = folder in selectedFolders,
-                    historyMap = historyMap,
-                    onClick = onClick,
-                    onLongClick = onLongClick
-                )
-            }
-        }
+
+        FastScrollerOverlay(
+            itemCount = sortedFolders.size,
+            sectionTextExtractor = { index ->
+                sortedFolders.getOrNull(index)?.getSectionLabel() ?: ""
+            },
+            listState = if (settings.layoutMode == LayoutMode.GRID) null else listState,
+            gridState = if (settings.layoutMode == LayoutMode.GRID) gridState else null,
+            topPadding = contentPadding.calculateTopPadding(),
+            bottomPadding = contentPadding.calculateBottomPadding()
+        )
     }
 }

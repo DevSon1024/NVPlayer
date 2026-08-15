@@ -11,3 +11,8 @@ data class VideoFolder(
     val name: String,
     // val videoCount: Int
 )
+
+fun VideoFolder.getSectionLabel(): String {
+    val firstChar = name.trim().firstOrNull()?.uppercaseChar()
+    return if (firstChar != null && firstChar.isLetter()) firstChar.toString() else "#"
+}
