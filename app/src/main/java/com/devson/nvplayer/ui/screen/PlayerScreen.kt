@@ -255,6 +255,14 @@ fun PlayerScreen(
     var showQualitySideSheet by remember { mutableStateOf(false) }
     var showImportSubtitleDialog by remember { mutableStateOf(false) }
 
+    val safSubtitlePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            activeViewModel?.importSubtitle(uri)
+        }
+    }
+
     val topLeftButtons = remember(playbackSettings.topLeftControls) {
         // Landscape TopLeft: always starts with BACK_ARROW + VIDEO_TITLE (non-editable anchor)
         val parsed = playbackSettings.topLeftControls.split(',').mapNotNull { runCatching { PlayerButton.valueOf(it) }.getOrNull() }
@@ -973,10 +981,21 @@ fun PlayerScreen(
                 ) {
                     StorageExplorerScreen(
                         operationType = "SELECT_FILE",
-                        allowedExtensions = listOf(".srt", ".vtt", ".ssa", ".ass", ".ttml", ".sub", ".pgs", ".sbv"),
+                        allowedExtensions = listOf(".srt", ".vtt", ".ssa", ".ass", ".ttml", ".sub", ".pgs", ".sbv", ".smi"),
                         onFileSelected = { file ->
                             showImportSubtitleDialog = false
                             activeViewModel?.importSubtitle(Uri.fromFile(file))
+                        },
+                        onOpenSystemPicker = {
+                            showImportSubtitleDialog = false
+                            safSubtitlePickerLauncher.launch(
+                                arrayOf(
+                                    "text/*",
+                                    "application/x-subrip",
+                                    "application/octet-stream",
+                                    "*/*"
+                                )
+                            )
                         },
                         onCancel = { showImportSubtitleDialog = false }
                     )

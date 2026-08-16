@@ -35,8 +35,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.devson.nvplayer.domain.model.StorageVolumeInfo
 import com.devson.nvplayer.ui.components.CustomRenameDialog
 import com.devson.nvplayer.ui.common.components.FileOperationProgressDialog
+import com.devson.nvplayer.util.getAvailableStorageVolumes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -114,21 +116,29 @@ fun StorageExplorerScreen(
     onFoldersBlacklisted: (List<String>) -> Unit = {},
     onComplete: () -> Unit = {},
     fileOpsViewModel: FileOperationsViewModel = viewModel(),
+    onOpenSystemPicker: (() -> Unit)? = null,
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    val root = remember { Environment.getExternalStorageDirectory() }
-    var currentDir by remember { mutableStateOf(root) }
+    val availableStorages = remember { getAvailableStorageVolumes(context) }
+    var selectedStorage by remember {
+        mutableStateOf(availableStorages.firstOrNull { it.isInternal } ?: availableStorages.firstOrNull())
+    }
 
-    val canGoUp = currentDir.absolutePath != root.absolutePath
+    val rootFile by remember(selectedStorage) {
+        derivedStateOf { File(selectedStorage?.rootPath ?: Environment.getExternalStorageDirectory().absolutePath) }
+    }
+    var currentDir by remember(selectedStorage) { mutableStateOf(rootFile) }
+
+    val canGoUp = currentDir.absolutePath != rootFile.absolutePath
     BackHandler(enabled = canGoUp) {
         val parent = currentDir.parentFile
-        if (parent != null && parent.absolutePath.startsWith(root.absolutePath)) {
+        if (parent != null && parent.absolutePath.startsWith(rootFile.absolutePath)) {
             currentDir = parent
         } else {
-            currentDir = root
+            currentDir = rootFile
         }
     }
     var entries by remember { mutableStateOf<List<FileNode>>(emptyList()) }
@@ -146,13 +156,13 @@ fun StorageExplorerScreen(
         isLoading = false
     }
 
-    // Breadcrumb: list of File from root → currentDir
-    val breadcrumbs: List<File> = remember(currentDir) {
+    // Breadcrumb: list of File from rootFile → currentDir
+    val breadcrumbs: List<File> = remember(currentDir, rootFile) {
         val segments = mutableListOf<File>()
         var f: File? = currentDir
         while (f != null) {
             segments.add(0, f)
-            if (f.absolutePath == root.absolutePath) break
+            if (f.absolutePath == rootFile.absolutePath) break
             f = f.parentFile
         }
         segments
@@ -164,8 +174,8 @@ fun StorageExplorerScreen(
     }
 
     // Convert absolute path → MediaStore RELATIVE_PATH (e.g. "Movies/Anime/Season1")
-    val targetRelativePath = remember(currentDir) {
-        val rootPath = root.absolutePath
+    val targetRelativePath = remember(currentDir, rootFile) {
+        val rootPath = rootFile.absolutePath
         val absPath = currentDir.absolutePath
         if (absPath == rootPath) {
             "Movies"
@@ -183,7 +193,7 @@ fun StorageExplorerScreen(
             title = "New Folder",
             confirmLabel = "Create",
             placeholder = "Folder name",
-            subtitle = "Inside: ${if (currentDir == root) "Internal Storage" else currentDir.name}",
+            subtitle = "Inside: ${if (currentDir.absolutePath == rootFile.absolutePath) (selectedStorage?.name ?: "Storage") else currentDir.name}",
             onConfirm = { name ->
                 val newDir = File(currentDir, name.trim())
                 val created = when {
@@ -220,7 +230,7 @@ fun StorageExplorerScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = if (currentDir == root) "Internal Storage" else currentDir.name,
+                            text = if (currentDir.absolutePath == rootFile.absolutePath) (selectedStorage?.name ?: "Storage") else currentDir.name,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             maxLines = 1,
@@ -231,7 +241,7 @@ fun StorageExplorerScreen(
                 navigationIcon = {
                     IconButton(onClick = {
                         val parent = currentDir.parentFile
-                        if (parent != null && currentDir.absolutePath != root.absolutePath) {
+                        if (parent != null && currentDir.absolutePath != rootFile.absolutePath) {
                             currentDir = parent
                         } else {
                             onCancel()
@@ -244,7 +254,16 @@ fun StorageExplorerScreen(
                     }
                 },
                 actions = {
-                    if (!isBlacklistMode) {
+                    if (operationType == "SELECT_FILE" && onOpenSystemPicker != null) {
+                        IconButton(onClick = onOpenSystemPicker) {
+                            Icon(
+                                imageVector = Icons.Rounded.FolderOpen,
+                                contentDescription = "System File Picker",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    if (!isBlacklistMode && operationType != "SELECT_FILE") {
                         IconButton(onClick = { showNewFolderDialog = true }) {
                             Icon(
                                 imageVector = Icons.Rounded.CreateNewFolder,
@@ -393,6 +412,49 @@ fun StorageExplorerScreen(
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
 
+                // Storage Tabs (shown when multiple storage volumes exist)
+                if (availableStorages.size > 1) {
+                    ScrollableTabRow(
+                        selectedTabIndex = availableStorages.indexOfFirst { it.id == selectedStorage?.id }.coerceAtLeast(0),
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        edgePadding = 16.dp,
+                        divider = {}
+                    ) {
+                        availableStorages.forEach { storage ->
+                            val isSelected = storage.id == selectedStorage?.id
+                            Tab(
+                                selected = isSelected,
+                                onClick = {
+                                    if (selectedStorage?.id != storage.id) {
+                                        selectedStorage = storage
+                                        currentDir = File(storage.rootPath)
+                                    }
+                                },
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (storage.isInternal) Icons.Rounded.PhoneAndroid else Icons.Rounded.SdCard,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = storage.name,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
                 // Breadcrumb row
                 LazyRow(
                     state = breadcrumbState,
@@ -407,7 +469,7 @@ fun StorageExplorerScreen(
                         contentType = { "breadcrumb_item" }
                     ) { crumb ->
                         val isLast = crumb == breadcrumbs.last()
-                        val label = if (crumb.absolutePath == root.absolutePath) "Internal Storage" else crumb.name
+                        val label = if (crumb.absolutePath == rootFile.absolutePath) (selectedStorage?.name ?: "Storage") else crumb.name
                         val onClick = remember(crumb) { { currentDir = crumb } }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(

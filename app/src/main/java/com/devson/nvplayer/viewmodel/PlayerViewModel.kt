@@ -205,7 +205,7 @@ class PlayerViewModel(
                         restorePlaybackProgress()
                     }
                     if (!isExternalSubtitleLoaded) {
-                        loadSavedExternalSubtitle()
+                        autoDetectAndLoadSubtitles()
                     }
                     val settings = playbackSettings.value
                     if (settings.isAmbientModeEnabled) {
@@ -784,38 +784,83 @@ class PlayerViewModel(
     fun importSubtitle(uri: Uri, select: Boolean = true) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val file = if (uri.scheme == "file") {
-                    File(uri.path ?: "")
-                } else if (uri.scheme == null) {
-                    File(uri.toString())
-                } else {
-                    null
+                var subtitlePath: String? = null
+                var fileName = "External Subtitle"
+
+                if (uri.scheme == "file" || uri.scheme == null) {
+                    val filePath = uri.path ?: uri.toString()
+                    val file = File(filePath)
+                    if (file.exists() && file.canRead()) {
+                        subtitlePath = file.absolutePath
+                        fileName = file.name
+                    }
+                } else if (uri.scheme == "content") {
+                    // Try to resolve direct filesystem path if available
+                    try {
+                        val projection = arrayOf(MediaStore.MediaColumns.DATA, MediaStore.MediaColumns.DISPLAY_NAME)
+                        getApplication<Application>().contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                val nameIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
+                                if (nameIdx != -1) {
+                                    val name = cursor.getString(nameIdx)
+                                    if (!name.isNullOrBlank()) fileName = name
+                                }
+                                val dataIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+                                if (dataIdx != -1) {
+                                    val dataPath = cursor.getString(dataIdx)
+                                    if (!dataPath.isNullOrBlank()) {
+                                        val f = File(dataPath)
+                                        if (f.exists() && f.canRead()) {
+                                            subtitlePath = f.absolutePath
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {}
+
+                    // If direct path is not readable (e.g. Scoped Storage / SAF), copy to app cache
+                    if (subtitlePath == null) {
+                        if (fileName == "External Subtitle") {
+                            val displayName = uri.lastPathSegment?.substringAfterLast('/')
+                            if (!displayName.isNullOrBlank()) fileName = displayName
+                        }
+                        val cacheDir = File(getApplication<Application>().cacheDir, "imported_subtitles")
+                        cacheDir.mkdirs()
+                        val cachedFile = File(cacheDir, "${System.currentTimeMillis()}_$fileName")
+                        getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
+                            cachedFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        if (cachedFile.exists() && cachedFile.length() > 0) {
+                            subtitlePath = cachedFile.absolutePath
+                        }
+                    }
                 }
-                
-                if (file != null && (!file.exists() || !file.canRead())) {
+
+                val finalPath = subtitlePath
+                if (finalPath == null) {
                     withContext(Dispatchers.Main) {
                         Toast.makeText(getApplication(), "Subtitle file is not readable", Toast.LENGTH_LONG).show()
                     }
                     return@launch
                 }
-                
-                val absolutePath = file?.absolutePath ?: uri.toString()
-                val fileName = file?.name ?: uri.lastPathSegment ?: "External Subtitle"
-                
+
                 // Save to database
                 val videoUriStr = _currentUri.value?.toString()
                 if (videoUriStr != null) {
                     val dao = AppDatabase.getDatabase(getApplication()).videoMetadataDao()
                     dao.saveExternalSubtitle(videoUriStr, uri.toString())
                 }
-                
+
                 withContext(Dispatchers.Main) {
-                    playerEngine.addExternalSubtitle(absolutePath, select)
+                    playerEngine.addExternalSubtitle(finalPath, select)
                     if (select) {
                         Toast.makeText(getApplication(), "Subtitle imported: $fileName", Toast.LENGTH_SHORT).show()
                     }
                 }
-            } catch (e: java.lang.Exception) {
+            } catch (e: Exception) {
                 Log.e("PlayerViewModel", "Error importing subtitle", e)
                 withContext(Dispatchers.Main) {
                     Toast.makeText(getApplication(), "Failed to import subtitle: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
@@ -824,20 +869,129 @@ class PlayerViewModel(
         }
     }
 
-    private fun loadSavedExternalSubtitle() {
+    private fun autoDetectAndLoadSubtitles() {
         val uri = _currentUri.value ?: return
         isExternalSubtitleLoaded = true
         viewModelScope.launch(Dispatchers.IO) {
-            val dao = AppDatabase.getDatabase(getApplication()).videoMetadataDao()
-            val metadata = dao.getMetadataByUri(uri.toString())
-            val savedSubUriStr = metadata?.externalSubtitleUri
-            if (!savedSubUriStr.isNullOrBlank()) {
-                Log.d("PlayerViewModel", "Auto-loading saved subtitle: $savedSubUriStr")
-                withContext(Dispatchers.Main) {
-                    importSubtitle(Uri.parse(savedSubUriStr), select = false)
+            try {
+                val loadedPaths = mutableSetOf<String>()
+
+                // 1. Load saved external subtitle from database if present
+                val dao = AppDatabase.getDatabase(getApplication()).videoMetadataDao()
+                val metadata = dao.getMetadataByUri(uri.toString())
+                val savedSubUriStr = metadata?.externalSubtitleUri
+                if (!savedSubUriStr.isNullOrBlank()) {
+                    Log.d("PlayerViewModel", "Auto-loading saved subtitle: $savedSubUriStr")
+                    withContext(Dispatchers.Main) {
+                        importSubtitle(Uri.parse(savedSubUriStr), select = false)
+                    }
                 }
+
+                // 2. Discover adjacent subtitle files from directory
+                val videoPath = resolveVideoFilePath(uri)
+                if (!videoPath.isNullOrBlank()) {
+                    val videoFile = File(videoPath)
+                    val parentDir = videoFile.parentFile
+                    if (parentDir != null && parentDir.exists() && parentDir.isDirectory) {
+                        val videoBaseName = videoFile.nameWithoutExtension.lowercase()
+                        val supportedExts = setOf("srt", "vtt", "ass", "ssa", "sub", "ttml", "sbv", "pgs", "smi")
+
+                        val candidateFiles = mutableListOf<File>()
+
+                        // Scan parent directory
+                        parentDir.listFiles()?.forEach { file ->
+                            if (file.isFile && file.extension.lowercase() in supportedExts) {
+                                candidateFiles.add(file)
+                            }
+                        }
+
+                        // Scan common subtitle subdirectories (subs, subtitles)
+                        val subFolders = listOf("subs", "Subs", "subtitles", "Subtitles", "SUBTITLES")
+                        for (folderName in subFolders) {
+                            val subDir = File(parentDir, folderName)
+                            if (subDir.exists() && subDir.isDirectory) {
+                                subDir.listFiles()?.forEach { file ->
+                                    if (file.isFile && file.extension.lowercase() in supportedExts) {
+                                        candidateFiles.add(file)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Filter matching subtitles for this video
+                        val matchingSubtitles = candidateFiles.filter { file ->
+                            val subName = file.nameWithoutExtension.lowercase()
+                            subName.startsWith(videoBaseName) ||
+                            subName.contains(videoBaseName) ||
+                            candidateFiles.size <= 2
+                        }.sortedWith(
+                            compareBy<File> {
+                                // Exact name match gets highest priority
+                                if (it.nameWithoutExtension.equals(videoFile.nameWithoutExtension, ignoreCase = true)) 0 else 1
+                            }.thenBy { it.name.lowercase() }
+                        )
+
+                        for (subFile in matchingSubtitles) {
+                            if (subFile.canRead() && !loadedPaths.contains(subFile.absolutePath)) {
+                                loadedPaths.add(subFile.absolutePath)
+                                Log.d("PlayerViewModel", "Auto-discovered adjacent subtitle: ${subFile.absolutePath}")
+                                withContext(Dispatchers.Main) {
+                                    playerEngine.addExternalSubtitle(subFile.absolutePath, select = false)
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("PlayerViewModel", "Error in auto-detecting subtitles", e)
             }
         }
+    }
+
+    private fun resolveVideoFilePath(uri: Uri): String? {
+        if (uri.scheme == "file") {
+            return uri.path
+        }
+        if (uri.scheme == null) {
+            return uri.toString()
+        }
+        if (uri.scheme == "content") {
+            // 1. Try querying MediaStore DATA column
+            try {
+                val projection = arrayOf(MediaStore.Video.Media.DATA)
+                getApplication<Application>().contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val idx = cursor.getColumnIndex(MediaStore.Video.Media.DATA)
+                        if (idx != -1) {
+                            val path = cursor.getString(idx)
+                            if (!path.isNullOrBlank() && File(path).exists()) {
+                                return path
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+
+            // 2. Check if the URI path itself contains an absolute /storage/ path
+            val uriPath = uri.path
+            if (uriPath != null) {
+                val storageIdx = uriPath.indexOf("/storage/")
+                if (storageIdx != -1) {
+                    val candidate = uriPath.substring(storageIdx)
+                    if (File(candidate).exists()) {
+                        return candidate
+                    }
+                }
+            }
+
+            // 3. Fallback to matching with the currently prepared queue item's path
+            val currentQueue = _queueList.value
+            val match = currentQueue.firstOrNull { it.uri == uri.toString() }
+            if (match != null && match.path.isNotBlank() && File(match.path).exists()) {
+                return match.path
+            }
+        }
+        return null
     }
 
     fun selectAudioTrack(id: Int) {
