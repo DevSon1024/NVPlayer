@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import com.devson.nvplayer.ui.screens.videolist.state.ExplorerItem
 import com.devson.nvplayer.ui.screens.videolist.state.PathSegment
@@ -313,7 +314,9 @@ class VideoListViewModel(
                                 finalDateModified = cached.dateModified
                                 finalDuration = cached.duration
                             } else {
-                                val extracted = com.devson.nvplayer.util.getVideoMetadata(repository.context, item.uri)
+                                val extracted = withTimeoutOrNull(1000L) {
+                                    com.devson.nvplayer.util.getVideoMetadata(repository.context, item.uri)
+                                } ?: com.devson.nvplayer.util.VideoMetadata(0L, 0L)
                                 finalSize = if (extracted.fileSize > 0) extracted.fileSize else item.size
                                 finalDateModified = if (extracted.lastModified > 0) extracted.lastModified else item.dateModified * 1000
                                 finalDuration = item.duration
@@ -355,11 +358,16 @@ class VideoListViewModel(
                         mappedVideos[videoFolder] = videos
                     }
                     index++
+
+                    // Progressive chunk emission so Compose UI updates smoothly without blocking
+                    if (index % 2 == 0 || index == totalPaths) {
+                        _rawVideosByFolder.value = mappedVideos.toMap()
+                        _rawVideosFlat.value = mappedVideos.values.flatten()
+                    }
                 }
 
                 _loadingProgress.value = 1f
-                // Store raw (unfiltered) - the combine flows handle storage + search filtering reactively
-                _rawVideosByFolder.value = mappedVideos
+                _rawVideosByFolder.value = mappedVideos.toMap()
                 _rawVideosFlat.value = mappedVideos.values.flatten()
             } catch (e: Exception) {
                 android.util.Log.e("VideoListViewModel", "Failed to load videos", e)

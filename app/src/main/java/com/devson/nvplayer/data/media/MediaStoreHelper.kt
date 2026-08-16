@@ -30,13 +30,18 @@ class MediaStoreHelper(private val context: Context) {
             MediaStore.Video.Media.SIZE,
             MediaStore.Video.Media.WIDTH,
             MediaStore.Video.Media.HEIGHT,
-            MediaStore.Video.Media.DATE_MODIFIED
+            MediaStore.Video.Media.DATE_MODIFIED,
+            MediaStore.Video.Media.MIME_TYPE
         )
 
         val sortOrder = "${MediaStore.Video.Media.DATE_ADDED} DESC"
 
         val selectionParts = mutableListOf<String>()
         val selectionArgsList = mutableListOf<String>()
+
+        // Strictly filter for video MIME types
+        selectionParts.add("${MediaStore.Video.Media.MIME_TYPE} LIKE ?")
+        selectionArgsList.add("video/%")
 
         if (folderName != null) {
             selectionParts.add("${MediaStore.Video.Media.BUCKET_DISPLAY_NAME} = ?")
@@ -69,12 +74,23 @@ class MediaStoreHelper(private val context: Context) {
             val widthColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.WIDTH)
             val heightColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.HEIGHT)
             val dateModifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_MODIFIED)
+            val mimeTypeColumn = cursor.getColumnIndex(MediaStore.Video.Media.MIME_TYPE)
 
             while (cursor.moveToNext()) {
+                val mimeType = if (mimeTypeColumn != -1) cursor.getString(mimeTypeColumn) else null
+                if (mimeType != null && !mimeType.startsWith("video/")) {
+                    continue
+                }
+
+                val data = cursor.getString(dataColumn) ?: ""
+                // Guard against TypeScript source files named .ts
+                if (data.endsWith(".ts", ignoreCase = true) && !isValidMpegTs(data)) {
+                    continue
+                }
+
                 val id = cursor.getLong(idColumn)
                 val title = cursor.getString(nameColumn) ?: "Unknown"
                 val duration = cursor.getLong(durationColumn)
-                val data = cursor.getString(dataColumn) ?: ""
                 val size = cursor.getLong(sizeColumn)
                 val width = cursor.getInt(widthColumn)
                 val height = cursor.getInt(heightColumn)
@@ -103,6 +119,22 @@ class MediaStoreHelper(private val context: Context) {
         videos
     }
 
+    private fun isValidMpegTs(path: String): Boolean {
+        if (path.isEmpty()) return true
+        val file = File(path)
+        if (!file.exists() || !file.canRead() || file.isDirectory) return false
+        if (file.length() < 188) return false
+        return runCatching {
+            file.inputStream().use { input ->
+                val header = ByteArray(564)
+                val read = input.read(header)
+                if (read >= 188) {
+                    header[0] == 0x47.toByte() || (read >= 376 && header[188] == 0x47.toByte())
+                } else false
+            }
+        }.getOrDefault(false)
+    }
+
     suspend fun getVideosByFolder(folderName: String, blacklistedFolders: List<String> = emptyList()): List<VideoItem> =
         getAllVideos(blacklistedFolders, folderName)
 
@@ -127,10 +159,11 @@ class MediaStoreHelper(private val context: Context) {
             MediaStore.Video.Media.SIZE,
             MediaStore.Video.Media.WIDTH,
             MediaStore.Video.Media.HEIGHT,
-            MediaStore.Video.Media.DATE_MODIFIED
+            MediaStore.Video.Media.DATE_MODIFIED,
+            MediaStore.Video.Media.MIME_TYPE
         )
 
-        val selectionBuilder = StringBuilder("${MediaStore.Video.Media.IS_TRASHED}=1")
+        val selectionBuilder = StringBuilder("${MediaStore.Video.Media.IS_TRASHED}=1 AND ${MediaStore.Video.Media.MIME_TYPE} LIKE 'video/%'")
         var selectionArgs: Array<String>? = null
         if (blacklistedFolders.isNotEmpty()) {
             blacklistedFolders.forEach { _ ->
@@ -165,12 +198,22 @@ class MediaStoreHelper(private val context: Context) {
             val widthColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.WIDTH)
             val heightColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.HEIGHT)
             val dateModifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_MODIFIED)
+            val mimeTypeColumn = cursor.getColumnIndex(MediaStore.Video.Media.MIME_TYPE)
 
             while (cursor.moveToNext()) {
+                val mimeType = if (mimeTypeColumn != -1) cursor.getString(mimeTypeColumn) else null
+                if (mimeType != null && !mimeType.startsWith("video/")) {
+                    continue
+                }
+
+                val data = cursor.getString(dataColumn) ?: ""
+                if (data.endsWith(".ts", ignoreCase = true) && !isValidMpegTs(data)) {
+                    continue
+                }
+
                 val id = cursor.getLong(idColumn)
                 val title = cursor.getString(nameColumn) ?: "Unknown"
                 val duration = cursor.getLong(durationColumn)
-                val data = cursor.getString(dataColumn) ?: ""
                 val size = cursor.getLong(sizeColumn)
                 val width = cursor.getInt(widthColumn)
                 val height = cursor.getInt(heightColumn)

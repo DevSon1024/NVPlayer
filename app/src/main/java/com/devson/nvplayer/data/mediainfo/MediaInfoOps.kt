@@ -4,13 +4,15 @@ import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import net.mediaarea.mediainfo.lib.MediaInfo
 
 object MediaInfoOps {
   /**
-   * Extract detailed media information from a video file
+   * Extract detailed media information from a video file with a fail-fast timeout
    */
   suspend fun getMediaInfo(
       context: Context,
@@ -18,96 +20,118 @@ object MediaInfoOps {
       fileName: String,
   ): Result<MediaInfoData> =
       withContext(Dispatchers.IO) {
-          runCatching {
-              val contentResolver = context.contentResolver
-              val pfd =
-                  contentResolver.openFileDescriptor(uri, "r")
-                      ?: return@runCatching MediaInfoData.empty()
+          if (!isLikelyMediaStream(context, uri, fileName)) {
+              Log.w("MediaInfoOps", "Skipping MediaInfo parse: $fileName is not a valid media stream")
+              return@withContext Result.success(MediaInfoData.empty())
+          }
 
-              val fd = pfd.detachFd()
-              val mi = MediaInfo()
+          val result = withTimeoutOrNull(1000L) {
+              runCatching {
+                  val contentResolver = context.contentResolver
+                  val pfd =
+                      contentResolver.openFileDescriptor(uri, "r")
+                          ?: return@runCatching MediaInfoData.empty()
 
-              try {
-                  mi.Open(fd, fileName)
+                  val fd = pfd.detachFd()
+                  val mi = MediaInfo()
 
-                  val generalInfo = extractGeneralInfo(mi)
-                  val videoStreams = extractVideoStreams(mi)
-                  val audioStreams = extractAudioStreams(mi)
-                  val textStreams = extractTextStreams(mi)
-
-                  MediaInfoData(
-                      general = generalInfo,
-                      videoStreams = videoStreams,
-                      audioStreams = audioStreams,
-                      textStreams = textStreams,
-                  )
-              } finally {
-                  mi.Close()
-                  pfd.close()
-              }
-          }.recoverCatching { throwable ->
-              // Fallback using MediaMetadataRetriever to populate basic MediaInfoData safely
-              val retriever = MediaMetadataRetriever()
-              try {
-                  retriever.setDataSource(context, uri)
-                  val width =
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
-                          ?: "0"
-                  val height =
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
-                          ?: "0"
-                  val durationMs =
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                          ?.toLongOrNull() ?: 0L
-                  val durationStr = if (durationMs > 0) "${durationMs / 1000} s" else ""
-                  val bitRate =
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
-                          ?.toLongOrNull()
-                  val bitRateStr = if (bitRate != null) "${bitRate / 1000} kbps" else ""
-
-                  var size = 0L
                   try {
-                      context.contentResolver.openAssetFileDescriptor(uri, "r")?.use {
-                          size = it.length
-                      }
-                  } catch (e: Exception) {
-                  }
-                  val fileSizeStr = if (size > 0) "${size / (1024 * 1024)} MB" else ""
+                      mi.Open(fd, fileName)
 
-                  val mimeType =
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE) ?: ""
+                      val generalInfo = extractGeneralInfo(mi)
+                      val videoStreams = extractVideoStreams(mi)
+                      val audioStreams = extractAudioStreams(mi)
+                      val textStreams = extractTextStreams(mi)
 
-                  val generalInfo = GeneralInfo(
-                      completeName = uri.path ?: "",
-                      format = mimeType.substringAfter("/").uppercase(),
-                      fileSize = fileSizeStr,
-                      duration = durationStr,
-                      overallBitRate = bitRateStr,
-                      title = fileName.substringBeforeLast(".")
-                  )
-
-                  val videoStreams = listOf(
-                      VideoStreamInfo(
-                          streamIndex = 0,
-                          format = mimeType.substringAfter("/").uppercase(),
-                          width = width,
-                          height = height,
-                          duration = durationStr,
-                          bitRate = bitRateStr
+                      MediaInfoData(
+                          general = generalInfo,
+                          videoStreams = videoStreams,
+                          audioStreams = audioStreams,
+                          textStreams = textStreams,
                       )
-                  )
+                  } finally {
+                      mi.Close()
+                      pfd.close()
+                  }
+              }
+          }
 
-                  MediaInfoData(
-                      general = generalInfo,
-                      videoStreams = videoStreams,
-                      audioStreams = emptyList(),
-                      textStreams = emptyList()
-                  )
-              } finally {
-                  retriever.release()
+          if (result != null) {
+              result.recoverCatching { throwable ->
+                  extractRetrieverMediaInfo(context, uri, fileName)
+              }
+          } else {
+              Log.w("MediaInfoOps", "MediaInfo extraction timed out for $fileName (1000ms limit reached)")
+              runCatching {
+                  extractRetrieverMediaInfo(context, uri, fileName)
               }
           }
       }
+
+  private fun extractRetrieverMediaInfo(
+      context: Context,
+      uri: Uri,
+      fileName: String
+  ): MediaInfoData {
+      val retriever = MediaMetadataRetriever()
+      try {
+          retriever.setDataSource(context, uri)
+          val width =
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                  ?: "0"
+          val height =
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+                  ?: "0"
+          val durationMs =
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                  ?.toLongOrNull() ?: 0L
+          val durationStr = if (durationMs > 0) "${durationMs / 1000} s" else ""
+          val bitRate =
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
+                  ?.toLongOrNull()
+          val bitRateStr = if (bitRate != null) "${bitRate / 1000} kbps" else ""
+
+          var size = 0L
+          try {
+              context.contentResolver.openAssetFileDescriptor(uri, "r")?.use {
+                  size = it.length
+              }
+          } catch (_: Exception) {}
+          val fileSizeStr = if (size > 0) "${size / (1024 * 1024)} MB" else ""
+
+          val mimeType =
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE) ?: ""
+
+          val generalInfo = GeneralInfo(
+              completeName = uri.path ?: "",
+              format = mimeType.substringAfter("/").uppercase(),
+              fileSize = fileSizeStr,
+              duration = durationStr,
+              overallBitRate = bitRateStr,
+              title = fileName.substringBeforeLast(".")
+          )
+
+          val videoStreams = listOf(
+              VideoStreamInfo(
+                  streamIndex = 0,
+                  format = mimeType.substringAfter("/").uppercase(),
+                  width = width,
+                  height = height,
+                  duration = durationStr,
+                  bitRate = bitRateStr
+              )
+          )
+
+          return MediaInfoData(
+              general = generalInfo,
+              videoStreams = videoStreams,
+              audioStreams = emptyList(),
+              textStreams = emptyList()
+          )
+      } finally {
+          retriever.release()
+      }
+  }
 
   /**
    * Generate formatted text output from MediaInfoData using native MediaInfo Text format
@@ -118,84 +142,107 @@ object MediaInfoOps {
       fileName: String,
   ): Result<String> =
       withContext(Dispatchers.IO) {
-          runCatching {
-              val contentResolver = context.contentResolver
-              val pfd =
-                  contentResolver.openFileDescriptor(uri, "r")
-                      ?: return@runCatching "Error: Could not open file"
+          if (!isLikelyMediaStream(context, uri, fileName)) {
+              return@withContext Result.success("Error: Invalid media file format.")
+          }
 
-              val fd = pfd.detachFd()
-              val mi = MediaInfo()
+          val result = withTimeoutOrNull(1000L) {
+              runCatching {
+                  val contentResolver = context.contentResolver
+                  val pfd =
+                      contentResolver.openFileDescriptor(uri, "r")
+                          ?: return@runCatching "Error: Could not open file"
 
-              try {
-                  mi.Open(fd, fileName)
+                  val fd = pfd.detachFd()
+                  val mi = MediaInfo()
 
-                  // Set output format to Text (human-readable format like MediaInfo desktop app)
-                  mi.Option("Inform", "Text")
+                  try {
+                      mi.Open(fd, fileName)
 
-                  // Get the formatted text output
-                  val textOutput = mi.Inform()
+                      // Set output format to Text (human-readable format like MediaInfo desktop app)
+                      mi.Option("Inform", "Text")
 
-                  buildString {
-                      appendLine("=".repeat(60))
-                      appendLine("MEDIA INFO - $fileName")
-                      appendLine("=".repeat(60))
-                      appendLine()
-                      append(textOutput)
-                      appendLine()
-                      appendLine("=".repeat(60))
-                      appendLine("Generated by Nosved Player using MediaInfoLib")
-                      appendLine("=".repeat(60))
+                      // Get the formatted text output
+                      val textOutput = mi.Inform()
+
+                      buildString {
+                          appendLine("=".repeat(60))
+                          appendLine("MEDIA INFO - $fileName")
+                          appendLine("=".repeat(60))
+                          appendLine()
+                          append(textOutput)
+                          appendLine()
+                          appendLine("=".repeat(60))
+                          appendLine("Generated by Nosved Player using MediaInfoLib")
+                          appendLine("=".repeat(60))
+                      }
+                  } finally {
+                      mi.Close()
+                      pfd.close()
                   }
-              } finally {
-                  mi.Close()
-                  pfd.close()
               }
-          }.recoverCatching { throwable ->
-              val retriever = MediaMetadataRetriever()
-              try {
-                  retriever.setDataSource(context, uri)
-                  val width =
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
-                          ?: "0"
-                  val height =
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
-                          ?: "0"
-                  val durationMs =
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                          ?.toLongOrNull() ?: 0L
-                  val bitRate =
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
-                          ?.toLongOrNull()
-                  val bitRateStr = if (bitRate != null) "${bitRate / 1000} kbps" else "Unknown"
-                  val mimeType =
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
-                          ?: "Unknown"
+          }
 
-                  buildString {
-                      appendLine("=".repeat(60))
-                      appendLine("MEDIA INFO (Fallback) - $fileName")
-                      appendLine("=".repeat(60))
-                      appendLine()
-                      appendLine("General")
-                      appendLine("Format                                   : $mimeType")
-                      appendLine("Duration                                 : ${durationMs / 1000} s")
-                      appendLine("Overall bit rate                         : $bitRateStr")
-                      appendLine()
-                      appendLine("Video")
-                      appendLine("Width                                    : $width pixels")
-                      appendLine("Height                                   : $height pixels")
-                      appendLine("Mime type                                : $mimeType")
-                      appendLine()
-                      appendLine("=".repeat(60))
-                      appendLine("Generated by Nosved Player (JNI Unavailable)")
-                      appendLine("=".repeat(60))
-                  }
-              } finally {
-                  retriever.release()
+          if (result != null) {
+              result.recoverCatching { throwable ->
+                  extractRetrieverTextOutput(context, uri, fileName)
+              }
+          } else {
+              Log.w("MediaInfoOps", "generateTextOutput timed out for $fileName (1000ms limit reached)")
+              runCatching {
+                  extractRetrieverTextOutput(context, uri, fileName)
               }
           }
       }
+
+  private fun extractRetrieverTextOutput(
+      context: Context,
+      uri: Uri,
+      fileName: String
+  ): String {
+      val retriever = MediaMetadataRetriever()
+      try {
+          retriever.setDataSource(context, uri)
+          val width =
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                  ?: "0"
+          val height =
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+                  ?: "0"
+          val durationMs =
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                  ?.toLongOrNull() ?: 0L
+          val bitRate =
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
+                  ?.toLongOrNull()
+          val bitRateStr = if (bitRate != null) "${bitRate / 1000} kbps" else "Unknown"
+          val mimeType =
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+                  ?: "Unknown"
+
+          return buildString {
+              appendLine("=".repeat(60))
+              appendLine("MEDIA INFO (Fallback) - $fileName")
+              appendLine("=".repeat(60))
+              appendLine()
+              appendLine("General")
+              appendLine("Format                                   : $mimeType")
+              appendLine("Duration                                 : ${durationMs / 1000} s")
+              appendLine("Overall bit rate                         : $bitRateStr")
+              appendLine()
+              appendLine("Video")
+              appendLine("Width                                    : $width pixels")
+              appendLine("Height                                   : $height pixels")
+              appendLine("Mime type                                : $mimeType")
+              appendLine()
+              appendLine("=".repeat(60))
+              appendLine("Generated by Nosved Player")
+              appendLine("=".repeat(60))
+          }
+      } finally {
+          retriever.release()
+      }
+  }
 
   private fun MediaInfo.getInfo(
       stream: MediaInfo.Stream,
@@ -402,126 +449,160 @@ object MediaInfoOps {
       fileName: String,
   ): Result<VideoMetadata> =
       withContext(Dispatchers.IO) {
-          runCatching {
-              val contentResolver = context.contentResolver
-              val pfd =
-                  contentResolver.openFileDescriptor(uri, "r")
-                      ?: return@runCatching VideoMetadata(0L, 0L, 0, 0, 0f, false)
+          if (!isLikelyMediaStream(context, uri, fileName)) {
+              return@withContext Result.success(VideoMetadata(0L, 0L, 0, 0, 0f, false))
+          }
 
-              val fd = pfd.detachFd()
-              val mi = MediaInfo()
+          val result = withTimeoutOrNull(1000L) {
+              runCatching {
+                  val contentResolver = context.contentResolver
+                  val pfd =
+                      contentResolver.openFileDescriptor(uri, "r")
+                          ?: return@runCatching VideoMetadata(0L, 0L, 0, 0, 0f, false)
 
-              try {
-                  mi.Open(fd, fileName)
+                  val fd = pfd.detachFd()
+                  val mi = MediaInfo()
 
-                  // Extract file size in bytes
-                  val fileSizeStr = mi.getInfo(MediaInfo.Stream.General, 0, "FileSize")
-                  val fileSize = fileSizeStr.toLongOrNull() ?: 0L
+                  try {
+                      mi.Open(fd, fileName)
 
-                  // Extract duration in milliseconds - handle both integer and decimal formats
-                  val durationStr = mi.getInfo(MediaInfo.Stream.General, 0, "Duration")
-                  val duration = durationStr.toDoubleOrNull()?.toLong() ?: 0L
+                      // Extract file size in bytes
+                      val fileSizeStr = mi.getInfo(MediaInfo.Stream.General, 0, "FileSize")
+                      val fileSize = fileSizeStr.toLongOrNull() ?: 0L
 
-                  // Extract video resolution (width and height)
-                  val widthStr = mi.getInfo(MediaInfo.Stream.Video, 0, "Width")
-                  val width = widthStr.toIntOrNull() ?: 0
+                      // Extract duration in milliseconds - handle both integer and decimal formats
+                      val durationStr = mi.getInfo(MediaInfo.Stream.General, 0, "Duration")
+                      val duration = durationStr.toDoubleOrNull()?.toLong() ?: 0L
 
-                  val heightStr = mi.getInfo(MediaInfo.Stream.Video, 0, "Height")
-                  val height = heightStr.toIntOrNull() ?: 0
+                      // Extract video resolution (width and height)
+                      val widthStr = mi.getInfo(MediaInfo.Stream.Video, 0, "Width")
+                      val width = widthStr.toIntOrNull() ?: 0
 
-                  // Extract framerate (fps)
-                  val fpsStr = mi.getInfo(MediaInfo.Stream.Video, 0, "FrameRate")
-                  val fps = fpsStr.toFloatOrNull() ?: 0f
+                      val heightStr = mi.getInfo(MediaInfo.Stream.Video, 0, "Height")
+                      val height = heightStr.toIntOrNull() ?: 0
 
-                  val textCount = mi.Count_Get(MediaInfo.Stream.Text)
-                  val hasEmbeddedSubtitles = textCount > 0
+                      // Extract framerate (fps)
+                      val fpsStr = mi.getInfo(MediaInfo.Stream.Video, 0, "FrameRate")
+                      val fps = fpsStr.toFloatOrNull() ?: 0f
 
-                  val subtitleCodec = if (hasEmbeddedSubtitles) {
-                      val codecs = mutableSetOf<String>()
-                      for (i in 0 until textCount) {
-                          val codecId = mi.getInfo(MediaInfo.Stream.Text, i, "CodecID")
+                      val textCount = mi.Count_Get(MediaInfo.Stream.Text)
+                      val hasEmbeddedSubtitles = textCount > 0
 
-                          val normalizedCodec = when {
-                              codecId.contains("PGS", ignoreCase = true) -> "PGS"
-                              codecId.contains("ASS", ignoreCase = true) -> "ASS"
-                              codecId.contains("SSA", ignoreCase = true) -> "SSA"
-                              codecId.contains("SRT", ignoreCase = true) -> "SRT"
-                              codecId.contains("SUBRIP", ignoreCase = true) -> "SRT"
-                              codecId.contains("VOBSUB", ignoreCase = true) -> "DVD"
-                              codecId.contains("WEBVTT", ignoreCase = true) -> "VTT"
-                              codecId.contains("UTF8", ignoreCase = true) -> "SRT"
-                              codecId.contains("HDMV", ignoreCase = true) -> "PGS"
-                              codecId.contains("DVB", ignoreCase = true) -> "DVB"
-                              codecId.contains("MOV_TEXT", ignoreCase = true) -> "TX3G"
-                              codecId.isNotEmpty() -> {
-                                  codecId.substringAfterLast("/").substringAfterLast("_")
-                                      .uppercase()
+                      val subtitleCodec = if (hasEmbeddedSubtitles) {
+                          val codecs = mutableSetOf<String>()
+                          for (i in 0 until textCount) {
+                              val codecId = mi.getInfo(MediaInfo.Stream.Text, i, "CodecID")
+
+                              val normalizedCodec = when {
+                                  codecId.contains("PGS", ignoreCase = true) -> "PGS"
+                                  codecId.contains("ASS", ignoreCase = true) -> "ASS"
+                                  codecId.contains("SSA", ignoreCase = true) -> "SSA"
+                                  codecId.contains("SRT", ignoreCase = true) -> "SRT"
+                                  codecId.contains("SUBRIP", ignoreCase = true) -> "SRT"
+                                  codecId.contains("VOBSUB", ignoreCase = true) -> "DVD"
+                                  codecId.contains("WEBVTT", ignoreCase = true) -> "VTT"
+                                  codecId.contains("UTF8", ignoreCase = true) -> "SRT"
+                                  codecId.contains("HDMV", ignoreCase = true) -> "PGS"
+                                  codecId.contains("DVB", ignoreCase = true) -> "DVB"
+                                  codecId.contains("MOV_TEXT", ignoreCase = true) -> "TX3G"
+                                  codecId.isNotEmpty() -> {
+                                      codecId.substringAfterLast("/").substringAfterLast("_")
+                                          .uppercase()
+                                  }
+
+                                  else -> ""
                               }
 
-                              else -> ""
+                              if (normalizedCodec.isNotEmpty()) {
+                                  codecs.add(normalizedCodec)
+                              }
                           }
+                          codecs.joinToString(" ")
+                      } else ""
 
-                          if (normalizedCodec.isNotEmpty()) {
-                              codecs.add(normalizedCodec)
-                          }
-                      }
-                      codecs.joinToString(" ")
-                  } else ""
-
-                  VideoMetadata(
-                      fileSize,
-                      duration,
-                      width,
-                      height,
-                      fps,
-                      hasEmbeddedSubtitles,
-                      subtitleCodec
-                  )
-              } finally {
-                  mi.Close()
-                  pfd.close()
-              }
-          }.recoverCatching { throwable ->
-              val retriever = MediaMetadataRetriever()
-              try {
-                  retriever.setDataSource(context, uri)
-                  val width =
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
-                          ?.toIntOrNull() ?: 0
-                  val height =
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
-                          ?.toIntOrNull() ?: 0
-                  val duration =
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                          ?.toLongOrNull() ?: 0L
-
-                  var size = 0L
-                  try {
-                      context.contentResolver.openAssetFileDescriptor(uri, "r")?.use {
-                          size = it.length
-                      }
-                  } catch (e: Exception) {
+                      VideoMetadata(
+                          fileSize,
+                          duration,
+                          width,
+                          height,
+                          fps,
+                          hasEmbeddedSubtitles,
+                          subtitleCodec
+                      )
+                  } finally {
+                      mi.Close()
+                      pfd.close()
                   }
+              }
+          }
 
-                  val fps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE)
-                          ?.toFloatOrNull() ?: 0f
-                  } else 0f
-
-                  VideoMetadata(
-                      sizeBytes = size,
-                      durationMs = duration,
-                      width = width,
-                      height = height,
-                      fps = fps,
-                      hasEmbeddedSubtitles = false,
-                      subtitleCodec = ""
-                  )
-              } finally {
-                  retriever.release()
+          if (result != null) {
+              result.recoverCatching { throwable ->
+                  extractRetrieverBasicMetadata(context, uri)
+              }
+          } else {
+              Log.w("MediaInfoOps", "extractBasicMetadata timed out for $fileName (1000ms limit reached)")
+              runCatching {
+                  extractRetrieverBasicMetadata(context, uri)
               }
           }
       }
+
+  private fun extractRetrieverBasicMetadata(
+      context: Context,
+      uri: Uri
+  ): VideoMetadata {
+      val retriever = MediaMetadataRetriever()
+      try {
+          retriever.setDataSource(context, uri)
+          val width =
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                  ?.toIntOrNull() ?: 0
+          val height =
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+                  ?.toIntOrNull() ?: 0
+          val duration =
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                  ?.toLongOrNull() ?: 0L
+
+          var size = 0L
+          try {
+              context.contentResolver.openAssetFileDescriptor(uri, "r")?.use {
+                  size = it.length
+              }
+          } catch (_: Exception) {}
+
+          val fps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+              retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE)
+                  ?.toFloatOrNull() ?: 0f
+          } else 0f
+
+          return VideoMetadata(
+              sizeBytes = size,
+              durationMs = duration,
+              width = width,
+              height = height,
+              fps = fps,
+              hasEmbeddedSubtitles = false,
+              subtitleCodec = ""
+          )
+      } finally {
+          retriever.release()
+      }
+  }
+
+  private fun isLikelyMediaStream(context: Context, uri: Uri, fileName: String): Boolean {
+      if (!fileName.endsWith(".ts", ignoreCase = true)) return true
+      return runCatching {
+          context.contentResolver.openInputStream(uri)?.use { stream ->
+              val buffer = ByteArray(564)
+              val read = stream.read(buffer)
+              if (read >= 188) {
+                  buffer[0] == 0x47.toByte() || (read >= 376 && buffer[188] == 0x47.toByte())
+              } else false
+          } ?: false
+      }.getOrDefault(false)
+  }
 
   /**
    * Data class to hold basic video metadata (size, duration, resolution, and framerate)
@@ -544,30 +625,36 @@ object MediaInfoOps {
       uri: Uri,
       fileName: String = "",
   ): Int = withContext(Dispatchers.IO) {
-      runCatching {
-          val contentResolver = context.contentResolver
-          val pfd = contentResolver.openFileDescriptor(uri, "r") ?: return@runCatching 0
-          val fd = pfd.detachFd()
-          val mi = MediaInfo()
-          try {
-              mi.Open(fd, fileName)
-              val rotationStr = mi.Get(MediaInfo.Stream.Video, 0, "Rotation")
-              rotationStr.toFloatOrNull()?.toInt() ?: 0
-          } finally {
-              mi.Close()
-              pfd.close()
+      if (!isLikelyMediaStream(context, uri, fileName)) return@withContext 0
+
+      val result = withTimeoutOrNull(1000L) {
+          runCatching {
+              val contentResolver = context.contentResolver
+              val pfd = contentResolver.openFileDescriptor(uri, "r") ?: return@runCatching 0
+              val fd = pfd.detachFd()
+              val mi = MediaInfo()
+              try {
+                  mi.Open(fd, fileName)
+                  val rotationStr = mi.Get(MediaInfo.Stream.Video, 0, "Rotation")
+                  rotationStr.toFloatOrNull()?.toInt() ?: 0
+              } finally {
+                  mi.Close()
+                  pfd.close()
+              }
           }
-      }.recover { throwable ->
+      }
+
+      result?.recover { throwable ->
           val retriever = MediaMetadataRetriever()
           try {
               retriever.setDataSource(context, uri)
               retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
                   ?.toIntOrNull() ?: 0
-          } catch (e: Exception) {
+          } catch (_: Exception) {
               0
           } finally {
               retriever.release()
           }
-      }.getOrDefault(0)
+      }?.getOrDefault(0) ?: 0
   }
 }

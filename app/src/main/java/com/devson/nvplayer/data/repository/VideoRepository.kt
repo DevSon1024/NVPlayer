@@ -27,7 +27,7 @@ class VideoRepository(
             val file = java.io.File(internalRoot, dir)
             if (file.exists() && file.isDirectory) {
                 file.walkTopDown().maxDepth(3).forEach { f ->
-                    if (f.isFile && isVideoFile(f.name)) {
+                    if (f.isFile && isVideoFile(f)) {
                         pathsToScan.add(f.absolutePath)
                     }
                 }
@@ -52,10 +52,26 @@ class VideoRepository(
         }
     }
 
-    private fun isVideoFile(fileName: String): Boolean {
-        val ext = fileName.substringAfterLast('.', "").lowercase()
-        return ext in setOf("mp4", "mkv", "webm", "avi", "3gp", "ts", "mov", "flv", "wmv", "m4v")
+    private fun isVideoFile(file: java.io.File): Boolean {
+        val ext = file.extension.lowercase()
+        val videoExtensions = setOf("mp4", "mkv", "webm", "avi", "3gp", "mov", "flv", "wmv", "m4v")
+        if (ext in videoExtensions) return true
+        if (ext == "ts") {
+            // Distinguish MPEG Transport Stream video from TypeScript code file
+            if (!file.exists() || !file.canRead() || file.length() < 188) return false
+            return runCatching {
+                file.inputStream().use { stream ->
+                    val buffer = ByteArray(564)
+                    val read = stream.read(buffer)
+                    if (read >= 188) {
+                        buffer[0] == 0x47.toByte() || (read >= 376 && buffer[188] == 0x47.toByte())
+                    } else false
+                }
+            }.getOrDefault(false)
+        }
+        return false
     }
+
     suspend fun getAllVideos(): List<VideoItem> = withContext(Dispatchers.IO) {
         val blacklisted = settingsRepo.playbackSettingsFlow.value.blacklistedFolders.toList()
         mediaStoreHelper.getAllVideos(blacklisted)
@@ -95,7 +111,9 @@ class VideoRepository(
                     finalDateModified = cached.dateModified
                     finalDuration = cached.duration
                 } else {
-                    val extracted = com.devson.nvplayer.util.getVideoMetadata(context, item.uri)
+                    val extracted = kotlinx.coroutines.withTimeoutOrNull(1000L) {
+                        com.devson.nvplayer.util.getVideoMetadata(context, item.uri)
+                    } ?: com.devson.nvplayer.util.VideoMetadata(0L, 0L)
                     finalSize = if (extracted.fileSize > 0) extracted.fileSize else item.size
                     finalDateModified = if (extracted.lastModified > 0) extracted.lastModified else item.dateModified * 1000
                     finalDuration = item.duration
