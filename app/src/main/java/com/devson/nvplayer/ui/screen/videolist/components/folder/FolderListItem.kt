@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -130,30 +131,36 @@ fun FolderListItem(
     videos: List<Video>,
     settings: ViewSettings,
     isSelected: Boolean = false,
+    isRecentlyPlayed: Boolean = false,
     historyMap: Map<String, WatchHistory> = emptyMap(),
     onClick: () -> Unit,
     onLongClick: () -> Unit = {}
 ) {
     val isHidden = folder.name.startsWith(".")
-    val newCount = remember(videos, historyMap) {
+    val newCount = remember(videos, historyMap, settings.newVideoDaysThreshold) {
         videos.count { v -> getWatchState(
             historyMap[v.uri]?.lastPositionMs ?: 0L,
-            v.duration
-        ) is VideoWatchState.Unplayed }
+            v.duration,
+            v.dateAdded,
+            settings.newVideoDaysThreshold
+        ) is VideoWatchState.New }
     }
+    val normalBg = MaterialTheme.colorScheme.surfaceContainerLow
     val bgColor by animateColorAsState(
-        targetValue  = if (isSelected)
-            MaterialTheme.colorScheme.primaryContainer
-        else
-            MaterialTheme.colorScheme.surfaceContainerLow,
+        targetValue = when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer
+            isRecentlyPlayed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f).compositeOver(normalBg)
+            else -> normalBg
+        },
         animationSpec = tween(180),
         label = "folderListBg"
     )
     val borderColor by animateColorAsState(
-        targetValue  = if (isSelected)
-            MaterialTheme.colorScheme.primary
-        else
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+        targetValue = when {
+            isSelected -> MaterialTheme.colorScheme.primary
+            isRecentlyPlayed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+            else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+        },
         animationSpec = tween(180),
         label = "folderListBorder"
     )
@@ -202,6 +209,7 @@ fun FolderListItem(
                         overflow   = TextOverflow.Ellipsis,
                         color      = when {
                             isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                            isRecentlyPlayed -> MaterialTheme.colorScheme.primary
                             isHidden   -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                             else       -> MaterialTheme.colorScheme.onSurface
                         }

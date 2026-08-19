@@ -66,6 +66,10 @@ fun ExplorerListContent(
     val currentOnVideoClick by rememberUpdatedState(onVideoClick)
     val currentOnVideoLongClick by rememberUpdatedState(onVideoLongClick)
 
+    val mostRecentHistoryUri = remember(historyMap) {
+        historyMap.values.filter { it.lastPlayedAt > 0L }.maxByOrNull { it.lastPlayedAt }?.uri
+    }
+
     if (settings.layoutMode == LayoutMode.GRID) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(settings.gridColumns),
@@ -99,6 +103,9 @@ fun ExplorerListContent(
                     is ExplorerItem.FolderItem -> {
                         val folder = item.folder
                         val folderVideos = remember(folder, folderVideosMap) { folderVideosMap[folder] ?: emptyList() }
+                        val isRecentlyPlayed = remember(folderVideos, mostRecentHistoryUri) {
+                            mostRecentHistoryUri != null && folderVideos.any { it.uri == mostRecentHistoryUri }
+                        }
                         val onClick = remember(folder) { { currentOnFolderClick(folder) } }
                         val onLongClick = remember(folder) {
                             {
@@ -111,12 +118,15 @@ fun ExplorerListContent(
                             videos = folderVideos,
                             settings = settings,
                             isSelected = folder in selectedFolders,
+                            isRecentlyPlayed = isRecentlyPlayed,
+                            historyMap = historyMap,
                             onClick = onClick,
                             onLongClick = onLongClick
                         )
                     }
                     is ExplorerItem.VideoItem -> {
                         val video = item.video
+                        val isRecentlyPlayed = mostRecentHistoryUri != null && video.uri == mostRecentHistoryUri
                         val onClick = remember(video) { { _: Video -> currentOnVideoClick(video) } }
                         val onLongClick = remember(video) {
                             { _: Video ->
@@ -128,6 +138,7 @@ fun ExplorerListContent(
                             video = video,
                             settings = settings,
                             isSelected = video in selectedVideos,
+                            isRecentlyPlayed = isRecentlyPlayed,
                             lastPositionMs = historyMap[video.uri]?.lastPositionMs ?: 0L,
                             onClick = onClick,
                             onLongClick = onLongClick
@@ -164,6 +175,9 @@ fun ExplorerListContent(
                     is ExplorerItem.FolderItem -> {
                         val folder = item.folder
                         val folderVideos = remember(folder, folderVideosMap) { folderVideosMap[folder] ?: emptyList() }
+                        val isRecentlyPlayed = remember(folderVideos, mostRecentHistoryUri) {
+                            mostRecentHistoryUri != null && folderVideos.any { it.uri == mostRecentHistoryUri }
+                        }
                         val onClick = remember(folder) { { currentOnFolderClick(folder) } }
                         val onLongClick = remember(folder) {
                             {
@@ -176,12 +190,15 @@ fun ExplorerListContent(
                             videos = folderVideos,
                             settings = settings,
                             isSelected = folder in selectedFolders,
+                            isRecentlyPlayed = isRecentlyPlayed,
+                            historyMap = historyMap,
                             onClick = onClick,
                             onLongClick = onLongClick
                         )
                     }
                     is ExplorerItem.VideoItem -> {
                         val video = item.video
+                        val isRecentlyPlayed = mostRecentHistoryUri != null && video.uri == mostRecentHistoryUri
                         val onClick = remember(video) { { _: Video -> currentOnVideoClick(video) } }
                         val onLongClick = remember(video) {
                             { _: Video ->
@@ -193,6 +210,7 @@ fun ExplorerListContent(
                             video = video,
                             settings = settings,
                             isSelected = video in selectedVideos,
+                            isRecentlyPlayed = isRecentlyPlayed,
                             lastPositionMs = historyMap[video.uri]?.lastPositionMs ?: 0L,
                             onClick = onClick,
                             onLongClick = onLongClick

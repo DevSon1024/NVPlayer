@@ -55,6 +55,10 @@ fun VideoListContent(
         }
         return
     }
+    val mostRecentHistoryUri = remember(historyMap) {
+        historyMap.values.filter { it.lastPlayedAt > 0L }.maxByOrNull { it.lastPlayedAt }?.uri
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         if (settings.layoutMode == LayoutMode.GRID) {
             LazyVerticalGrid(
@@ -75,12 +79,14 @@ fun VideoListContent(
                     key = { video -> video.uri },
                     contentType = { "video_item" }
                 ) { video ->
+                    val isRecentlyPlayed = mostRecentHistoryUri != null && video.uri == mostRecentHistoryUri
                     val onClick = remember(video) { { _: Video -> currentOnVideoClick(video) } }
                     val onLongClick = remember(video) { { _: Video -> currentOnVideoLongClick(video) } }
                     VideoGridItem(
                         video = video,
                         settings = settings,
                         isSelected = video in selectedVideos,
+                        isRecentlyPlayed = isRecentlyPlayed,
                         lastPositionMs = historyMap[video.uri]?.lastPositionMs ?: 0L,
                         onClick = onClick,
                         onLongClick = onLongClick
@@ -101,6 +107,7 @@ fun VideoListContent(
                     key = { video -> video.uri },
                     contentType = { "video_item" }
                 ) { video ->
+                    val isRecentlyPlayed = mostRecentHistoryUri != null && video.uri == mostRecentHistoryUri
                     val onClick = remember(video) { { _: Video -> currentOnVideoClick(video) } }
                     val onLongClick = remember(video) { { _: Video -> currentOnVideoLongClick(video) } }
                     val onInfo = remember(video) {
@@ -117,6 +124,7 @@ fun VideoListContent(
                         video = video,
                         settings = settings,
                         isSelected = video in selectedVideos,
+                        isRecentlyPlayed = isRecentlyPlayed,
                         lastPositionMs = historyMap[video.uri]?.lastPositionMs ?: 0L,
                         onClick = onClick,
                         onLongClick = onLongClick,

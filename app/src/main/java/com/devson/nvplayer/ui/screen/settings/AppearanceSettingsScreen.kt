@@ -47,6 +47,7 @@ import com.devson.nvplayer.ui.theme.AppThemePalette
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.devson.nvplayer.viewmodel.SettingsViewModel
 import com.devson.nvplayer.domain.model.ThumbnailMode
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,6 +61,7 @@ fun AppearanceSettingsScreen(
     val navBarTransparent by settingsViewModel.isNavBarTransparent.collectAsState()
     val isAmoledTheme by settingsViewModel.isAmoledTheme.collectAsState()
     val isEffectivelyDark = isDark ?: isSystemInDarkTheme()
+    val viewSettingsVal by settingsViewModel.viewSettings.collectAsState()
 
     var showLanguageDialog by remember { mutableStateOf(false) }
 
@@ -277,7 +279,6 @@ fun AppearanceSettingsScreen(
                 AppearanceSectionLabel("Thumbnails")
                 var showModeDialog by remember { mutableStateOf(false) }
                 var showClearConfirmDialog by remember { mutableStateOf(false) }
-                val viewSettingsVal by settingsViewModel.viewSettings.collectAsState()
 
                 SettingToggleCard(
                     icon = Icons.Default.Photo,
@@ -411,6 +412,65 @@ fun AppearanceSettingsScreen(
                             }
                         }
                     )
+                }
+            }
+
+            // BADGES & LABELS section
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                AppearanceSectionLabel("Badges & Labels")
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            RoundedCornerShape(12.dp)
+                        ),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                Text(
+                                    text = "Days Threshold for 'New' Label",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Videos added within this period show 'New', older show 'Unwatched'",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = "${viewSettingsVal.newVideoDaysThreshold} ${if (viewSettingsVal.newVideoDaysThreshold == 1) "Day" else "Days"}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Slider(
+                            value = viewSettingsVal.newVideoDaysThreshold.toFloat(),
+                            onValueChange = { settingsViewModel.updateNewVideoDaysThreshold(it.roundToInt()) },
+                            valueRange = 1f..30f,
+                            steps = 28,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
 

@@ -34,5 +34,6 @@ data class ViewSettings(
     val sortDirection: SortDirection = SortDirection.ASCENDING,
     val viewMode: ViewMode = ViewMode.ALL_FOLDERS,
     val thumbnailMode: ThumbnailMode = ThumbnailMode.FIRST_FRAME,
-    val thumbnailFramePosition: Float = 33f
+    val thumbnailFramePosition: Float = 33f,
+    val newVideoDaysThreshold: Int = 7
 )

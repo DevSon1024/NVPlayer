@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +40,7 @@ fun VideoListItem(
     video: Video,
     settings: ViewSettings,
     isSelected: Boolean = false,
+    isRecentlyPlayed: Boolean = false,
     lastPositionMs: Long = 0L,
     onClick: (Video) -> Unit,
     onLongClick: (Video) -> Unit,
@@ -46,20 +48,23 @@ fun VideoListItem(
 ) {
     val haptic = LocalHapticFeedback.current
  
-    // Smooth background colour transition on select
+    // Smooth background colour transition on select and recent play highlight
+    val normalBg = MaterialTheme.colorScheme.surfaceContainerLow
     val bgColor by animateColorAsState(
-        targetValue  = if (isSelected)
-            MaterialTheme.colorScheme.primaryContainer
-        else
-            MaterialTheme.colorScheme.surfaceContainerLow,
+        targetValue = when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer
+            isRecentlyPlayed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f).compositeOver(normalBg)
+            else -> normalBg
+        },
         animationSpec = tween(180),
         label = "listItemBg"
     )
     val borderColor by animateColorAsState(
-        targetValue  = if (isSelected)
-            MaterialTheme.colorScheme.primary
-        else
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+        targetValue = when {
+            isSelected -> MaterialTheme.colorScheme.primary
+            isRecentlyPlayed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+            else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+        },
         animationSpec = tween(180),
         label = "listItemBorder"
     )
@@ -94,8 +99,8 @@ fun VideoListItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             //  Thumbnail 
-            val watchState = remember(lastPositionMs, video.duration) {
-                getWatchState(lastPositionMs, video.duration)
+            val watchState = remember(lastPositionMs, video.duration, video.dateAdded, settings.newVideoDaysThreshold) {
+                getWatchState(lastPositionMs, video.duration, video.dateAdded, settings.newVideoDaysThreshold)
             }
             Card(
                 modifier = Modifier
@@ -171,12 +176,12 @@ fun VideoListItem(
                     fontWeight = FontWeight.SemiBold,
                     maxLines  = 2,
                     overflow  = TextOverflow.Ellipsis,
-                    color     = if (isSelected)
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    else if (watchState is VideoWatchState.Completed)
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    else
-                        MaterialTheme.colorScheme.onSurface
+                    color     = when {
+                        isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                        isRecentlyPlayed -> MaterialTheme.colorScheme.primary
+                        watchState is VideoWatchState.Completed -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
                 )
  
                 if (settings.showPath) {

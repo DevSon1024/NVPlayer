@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -36,33 +37,37 @@ fun VideoGridItem(
     video: Video,
     settings: ViewSettings,
     isSelected: Boolean = false,
+    isRecentlyPlayed: Boolean = false,
     lastPositionMs: Long = 0L,
     onClick: (Video) -> Unit,
     onLongClick: (Video) -> Unit
 ) {
     val haptic  = LocalHapticFeedback.current
     val isDense = settings.gridColumns >= 3
-    val watchState = remember(lastPositionMs, video.duration) {
-        getWatchState(lastPositionMs, video.duration)
+    val watchState = remember(lastPositionMs, video.duration, video.dateAdded, settings.newVideoDaysThreshold) {
+        getWatchState(lastPositionMs, video.duration, video.dateAdded, settings.newVideoDaysThreshold)
     }
     val displayTitle = remember(video.title, settings.showFileExtension) {
         if (settings.showFileExtension) video.title
         else video.title.substringBeforeLast(".")
     }
  
+    val normalBg = MaterialTheme.colorScheme.surfaceContainerLow
     val bgColor by animateColorAsState(
-        targetValue  = if (isSelected)
-            MaterialTheme.colorScheme.primaryContainer
-        else
-            MaterialTheme.colorScheme.surfaceContainerLow,
+        targetValue = when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer
+            isRecentlyPlayed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f).compositeOver(normalBg)
+            else -> normalBg
+        },
         animationSpec = tween(180),
         label = "gridItemBg"
     )
     val borderColor by animateColorAsState(
-        targetValue  = if (isSelected)
-            MaterialTheme.colorScheme.primary
-        else
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+        targetValue = when {
+            isSelected -> MaterialTheme.colorScheme.primary
+            isRecentlyPlayed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+            else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+        },
         animationSpec = tween(180),
         label = "gridItemBorder"
     )
@@ -84,7 +89,7 @@ fun VideoGridItem(
             shape     = RoundedCornerShape(18.dp),
             colors    = CardDefaults.cardColors(containerColor = bgColor),
             elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 1.dp),
-            border    = BorderStroke(if (isSelected) 1.5.dp else 0.dp, borderColor)
+            border    = BorderStroke(if (isSelected) 1.5.dp else 1.dp, borderColor)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 // Wide thumbnail
@@ -135,12 +140,12 @@ fun VideoGridItem(
                             fontWeight = FontWeight.SemiBold,
                             maxLines   = 2,
                             overflow   = TextOverflow.Ellipsis,
-                            color      = if (isSelected)
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            else if (watchState is VideoWatchState.Completed)
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            else
-                                MaterialTheme.colorScheme.onSurface
+                            color      = when {
+                                isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                isRecentlyPlayed -> MaterialTheme.colorScheme.primary
+                                watchState is VideoWatchState.Completed -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                else -> MaterialTheme.colorScheme.onSurface
+                            }
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         VideoMetadataChips(video, settings, lastPositionMs)
@@ -167,7 +172,7 @@ fun VideoGridItem(
         shape     = RoundedCornerShape(14.dp),
         colors    = CardDefaults.cardColors(containerColor = bgColor),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 1.dp),
-        border    = BorderStroke(if (isSelected) 1.5.dp else 0.dp, borderColor)
+        border    = BorderStroke(if (isSelected) 1.5.dp else 1.dp, borderColor)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Thumbnail fills most of the card
@@ -224,12 +229,12 @@ fun VideoGridItem(
                         fontWeight = FontWeight.SemiBold,
                         maxLines   = 2,
                         overflow   = TextOverflow.Ellipsis,
-                        color      = if (isSelected)
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        else if (watchState is VideoWatchState.Completed)
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        else
-                            MaterialTheme.colorScheme.onSurface
+                        color      = when {
+                            isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                            isRecentlyPlayed -> MaterialTheme.colorScheme.primary
+                            watchState is VideoWatchState.Completed -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            else -> MaterialTheme.colorScheme.onSurface
+                        }
                     )
                     Spacer(modifier = Modifier.height(3.dp))
                     VideoMetadataChips(video, settings, lastPositionMs, isGrid = true)

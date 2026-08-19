@@ -111,7 +111,8 @@ class ViewSettingsRepository private constructor(context: Context) {
             } catch (e: Exception) {
                 ThumbnailMode.FIRST_FRAME
             },
-            thumbnailFramePosition = prefs.getFloat("thumbnail_frame_position", 33f)
+            thumbnailFramePosition = prefs.getFloat("thumbnail_frame_position", 33f),
+            newVideoDaysThreshold = prefs.getInt("new_video_days_threshold", 7)
         )
     }
 
@@ -147,6 +148,7 @@ class ViewSettingsRepository private constructor(context: Context) {
             putString("view_mode", updated.viewMode.name)
             putString("thumbnail_mode", updated.thumbnailMode.name)
             putFloat("thumbnail_frame_position", updated.thumbnailFramePosition)
+            putInt("new_video_days_threshold", updated.newVideoDaysThreshold)
             putBoolean("is_shortcuts_visible", updated.isShortcutsVisible)
             putBoolean("is_details_visible", updated.isDetailsVisible)
             putString("home_section_order", updated.homeSectionOrder.joinToString(",") { it.name })
@@ -252,6 +254,10 @@ class ViewSettingsRepository private constructor(context: Context) {
 
     suspend fun updateThumbnailFramePosition(pos: Float) {
         updateSettings { it.copy(thumbnailFramePosition = pos) }
+    }
+
+    suspend fun updateNewVideoDaysThreshold(days: Int) {
+        updateSettings { it.copy(newVideoDaysThreshold = days.coerceIn(1, 30)) }
     }
 
     suspend fun updateIsShortcutsVisible(visible: Boolean) {

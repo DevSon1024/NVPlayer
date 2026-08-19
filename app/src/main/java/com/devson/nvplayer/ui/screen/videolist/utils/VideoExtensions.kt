@@ -9,8 +9,8 @@ import com.devson.nvplayer.ui.screen.videolist.components.common.getWatchState
  * Common extension functions for Video objects and lists inside the VideoList screen.
  */
 
-fun Video.getWatchStatus(lastPositionMs: Long): VideoWatchState {
-    return getWatchState(lastPositionMs, this.duration)
+fun Video.getWatchStatus(lastPositionMs: Long, thresholdDays: Int = 7): VideoWatchState {
+    return getWatchState(lastPositionMs, this.duration, this.dateAdded, thresholdDays)
 }
 
 fun List<Video>.getUris(): List<Uri> {

@@ -54,6 +54,10 @@ fun FolderListContent(
     val currentOnFolderClick by rememberUpdatedState(onFolderClick)
     val currentOnFolderLongClick by rememberUpdatedState(onFolderLongClick)
 
+    val mostRecentHistoryUri = remember(historyMap) {
+        historyMap.values.filter { it.lastPlayedAt > 0L }.maxByOrNull { it.lastPlayedAt }?.uri
+    }
+
     if (sortedFolders.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CustomEmptyStateView(
@@ -86,6 +90,10 @@ fun FolderListContent(
                     key = { folder -> folder.id },
                     contentType = { "folder_item" }
                 ) { folder ->
+                    val folderVideos = remember(folder, folders) { folders[folder] ?: emptyList() }
+                    val isRecentlyPlayed = remember(folderVideos, mostRecentHistoryUri) {
+                        mostRecentHistoryUri != null && folderVideos.any { it.uri == mostRecentHistoryUri }
+                    }
                     val onClick = remember(folder) { { currentOnFolderClick(folder) } }
                     val onLongClick = remember(folder) {
                         {
@@ -95,9 +103,10 @@ fun FolderListContent(
                     }
                     FolderGridItem(
                         folder = folder,
-                        videos = folders[folder] ?: emptyList(),
+                        videos = folderVideos,
                         settings = settings,
                         isSelected = folder in selectedFolders,
+                        isRecentlyPlayed = isRecentlyPlayed,
                         historyMap = historyMap,
                         onClick = onClick,
                         onLongClick = onLongClick
@@ -118,6 +127,10 @@ fun FolderListContent(
                     key = { folder -> folder.id },
                     contentType = { "folder_item" }
                 ) { folder ->
+                    val folderVideos = remember(folder, folders) { folders[folder] ?: emptyList() }
+                    val isRecentlyPlayed = remember(folderVideos, mostRecentHistoryUri) {
+                        mostRecentHistoryUri != null && folderVideos.any { it.uri == mostRecentHistoryUri }
+                    }
                     val onClick = remember(folder) { { currentOnFolderClick(folder) } }
                     val onLongClick = remember(folder) {
                         {
@@ -127,9 +140,10 @@ fun FolderListContent(
                     }
                     FolderListItem(
                         folder = folder,
-                        videos = folders[folder] ?: emptyList(),
+                        videos = folderVideos,
                         settings = settings,
                         isSelected = folder in selectedFolders,
+                        isRecentlyPlayed = isRecentlyPlayed,
                         historyMap = historyMap,
                         onClick = onClick,
                         onLongClick = onLongClick

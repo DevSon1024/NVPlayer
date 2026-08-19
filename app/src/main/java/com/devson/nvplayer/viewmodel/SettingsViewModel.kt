@@ -146,6 +146,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { viewSettingsRepo.updateThumbnailFramePosition(pos) }
     }
 
+    fun updateNewVideoDaysThreshold(days: Int) {
+        viewModelScope.launch { viewSettingsRepo.updateNewVideoDaysThreshold(days) }
+    }
+
     fun clearThumbnailCache() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             ThumbnailRepository.getInstance(getApplication()).clearThumbnailCache()

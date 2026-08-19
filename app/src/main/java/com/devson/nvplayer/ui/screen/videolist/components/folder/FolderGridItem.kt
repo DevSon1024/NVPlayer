@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,6 +42,7 @@ import com.devson.nvplayer.domain.model.Video
 import com.devson.nvplayer.domain.model.VideoFolder
 import com.devson.nvplayer.domain.model.ViewSettings
 import com.devson.nvplayer.domain.model.WatchHistory
+import com.devson.nvplayer.ui.common.shapes.FolderShape
 import com.devson.nvplayer.ui.screen.videolist.components.common.VideoWatchState
 import com.devson.nvplayer.ui.screen.videolist.components.common.getWatchState
 import com.devson.nvplayer.ui.screens.videolist.components.selection.SelectionCheckmarkOverlay
@@ -51,32 +54,38 @@ fun FolderGridItem(
     videos: List<Video>,
     settings: ViewSettings,
     isSelected: Boolean = false,
+    isRecentlyPlayed: Boolean = false,
     historyMap: Map<String, WatchHistory> = emptyMap(),
     onClick: () -> Unit,
     onLongClick: () -> Unit = {}
 ) {
     val isHidden = folder.name.startsWith(".")
     val isDense = settings.gridColumns >= 3
-    val newCount = remember(videos, historyMap) {
+    val newCount = remember(videos, historyMap, settings.newVideoDaysThreshold) {
         videos.count { v -> getWatchState(
             historyMap[v.uri]?.lastPositionMs ?: 0L,
-            v.duration
-        ) is VideoWatchState.Unplayed }
+            v.duration,
+            v.dateAdded,
+            settings.newVideoDaysThreshold
+        ) is VideoWatchState.New }
     }
  
+    val normalBg = MaterialTheme.colorScheme.surfaceContainerLow
     val bgColor by animateColorAsState(
-        targetValue  = if (isSelected)
-            MaterialTheme.colorScheme.primaryContainer
-        else
-            MaterialTheme.colorScheme.surface,
+        targetValue = when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer
+            isRecentlyPlayed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f).compositeOver(normalBg)
+            else -> normalBg
+        },
         animationSpec = tween(180),
         label = "folderGridBg"
     )
     val borderColor by animateColorAsState(
-        targetValue  = if (isSelected)
-            MaterialTheme.colorScheme.primary
-        else
-            Color.Transparent,
+        targetValue = when {
+            isSelected -> MaterialTheme.colorScheme.primary
+            isRecentlyPlayed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+            else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+        },
         animationSpec = tween(180),
         label = "folderGridBorder"
     )
@@ -92,7 +101,7 @@ fun FolderGridItem(
             shape     = RoundedCornerShape(18.dp),
             colors    = CardDefaults.cardColors(containerColor = bgColor),
             elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 1.dp),
-            border    = BorderStroke(if (isSelected) 1.5.dp else 0.dp, borderColor)
+            border    = BorderStroke(if (isSelected) 1.5.dp else 1.dp, borderColor)
         ) {
             Box(modifier = Modifier.fillMaxWidth()) {
                 Row(
@@ -120,6 +129,7 @@ fun FolderGridItem(
                             overflow   = TextOverflow.Ellipsis,
                             color      = when {
                                 isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                isRecentlyPlayed -> MaterialTheme.colorScheme.primary
                                 isHidden   -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                                 else       -> MaterialTheme.colorScheme.onSurface
                             }
@@ -145,7 +155,7 @@ fun FolderGridItem(
             shape     = RoundedCornerShape(14.dp),
             colors    = CardDefaults.cardColors(containerColor = bgColor),
             elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 1.dp),
-            border    = BorderStroke(if (isSelected) 1.5.dp else 0.dp, borderColor)
+            border    = BorderStroke(if (isSelected) 1.5.dp else 1.dp, borderColor)
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -176,6 +186,7 @@ fun FolderGridItem(
                             overflow   = TextOverflow.Ellipsis,
                             color      = when {
                                 isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                isRecentlyPlayed -> MaterialTheme.colorScheme.primary
                                 isHidden   -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                                 else       -> MaterialTheme.colorScheme.onSurface
                             }
@@ -195,12 +206,12 @@ fun FolderGridItem(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(FolderShape())
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        shape     = RoundedCornerShape(10.dp),
-        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 1.dp),
-        border    = BorderStroke(if (isSelected) 1.5.dp else 0.dp, borderColor)
+        shape     = FolderShape(),
+        colors    = CardDefaults.cardColors(containerColor = Color.Transparent),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border    = null
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             FolderMediaPreview(
@@ -215,6 +226,7 @@ fun FolderGridItem(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .clip(FolderShape())
                     .background(
                         Brush.verticalGradient(
                             0.40f to Color.Transparent,
@@ -223,12 +235,22 @@ fun FolderGridItem(
                     )
             )
  
-            // Selected tint
+            // Selected or Recently played highlight conforming to FolderShape
             if (isSelected) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .clip(FolderShape())
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.30f))
+                        .border(1.5.dp, MaterialTheme.colorScheme.primary, FolderShape())
+                )
+            } else if (isRecentlyPlayed) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(FolderShape())
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.75f), FolderShape())
                 )
             }
  
@@ -241,7 +263,12 @@ fun FolderGridItem(
             ) {
                 Text(
                     text       = folder.name,
-                    color      = if (isHidden) Color.White.copy(alpha = 0.5f) else Color.White,
+                    color      = when {
+                        isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                        isRecentlyPlayed -> MaterialTheme.colorScheme.primaryContainer
+                        isHidden -> Color.White.copy(alpha = 0.5f)
+                        else -> Color.White
+                    },
                     style      = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines   = 1,
