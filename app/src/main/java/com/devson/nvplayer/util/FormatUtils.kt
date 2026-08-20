@@ -66,13 +66,8 @@ fun formatSortField(field: SortField): String {
         SortField.TITLE -> "Title"
         SortField.DATE -> "Date Added"
         SortField.PLAYED_TIME -> "Last Played"
-        SortField.STATUS -> "Progress Status"
         SortField.LENGTH -> "Duration"
         SortField.SIZE -> "File Size"
-        SortField.RESOLUTION -> "Resolution"
-        SortField.PATH -> "File Path"
-        SortField.FRAME_RATE -> "Frame Rate"
-        SortField.TYPE -> "File Type"
     }
 }
 

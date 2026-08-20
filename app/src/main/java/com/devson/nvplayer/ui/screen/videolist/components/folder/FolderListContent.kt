@@ -35,6 +35,7 @@ import com.devson.nvplayer.domain.model.WatchHistory
 import com.devson.nvplayer.domain.model.getSectionLabel
 import com.devson.nvplayer.ui.common.components.CustomEmptyStateView
 import com.devson.nvplayer.ui.common.components.FastScrollerOverlay
+import com.devson.nvplayer.ui.screens.videolist.utils.applyFolderSort
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -50,7 +51,9 @@ fun FolderListContent(
     contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
     val haptic = LocalHapticFeedback.current
-    val sortedFolders = remember(folders) { folders.keys.toList().sortedBy { it.name.lowercase() } }
+    val sortedFolders = remember(folders, settings.sortField, settings.sortDirection, historyMap) {
+        folders.keys.toList().applyFolderSort(folders, settings.sortField, settings.sortDirection, historyMap)
+    }
     val currentOnFolderClick by rememberUpdatedState(onFolderClick)
     val currentOnFolderLongClick by rememberUpdatedState(onFolderLongClick)
 
@@ -155,7 +158,9 @@ fun FolderListContent(
         FastScrollerOverlay(
             itemCount = sortedFolders.size,
             sectionTextExtractor = { index ->
-                sortedFolders.getOrNull(index)?.getSectionLabel() ?: ""
+                val folder = sortedFolders.getOrNull(index) ?: return@FastScrollerOverlay ""
+                val folderVideos = folders[folder] ?: emptyList()
+                folder.getSectionLabel(settings.sortField, folderVideos, historyMap)
             },
             listState = if (settings.layoutMode == LayoutMode.GRID) null else listState,
             gridState = if (settings.layoutMode == LayoutMode.GRID) gridState else null,

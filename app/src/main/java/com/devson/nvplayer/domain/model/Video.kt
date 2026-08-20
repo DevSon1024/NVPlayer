@@ -12,7 +12,7 @@ enum class ViewMode {
 }
 
 enum class SortField {
-    TITLE, DATE, PLAYED_TIME, STATUS, LENGTH, SIZE, RESOLUTION, PATH, FRAME_RATE, TYPE
+    TITLE, DATE, PLAYED_TIME, LENGTH, SIZE
 }
 
 enum class SortDirection {
@@ -49,23 +49,29 @@ data class Video(
     val thumbnailUri: String? = null
 )
 
-fun List<Video>.applySort(field: SortField, direction: SortDirection): List<Video> {
+fun List<Video>.applySort(
+    field: SortField,
+    direction: SortDirection,
+    historyMap: Map<String, WatchHistory> = emptyMap()
+): List<Video> {
     val sorted = when (field) {
         SortField.TITLE -> sortedBy { it.title.lowercase() }
-        SortField.DATE -> sortedBy { it.dateAdded }
-        SortField.PLAYED_TIME -> sortedBy { it.playedTime ?: 0L }
-        SortField.STATUS -> sortedBy { it.playedTime ?: 0L }
+        SortField.DATE -> sortedBy {
+            if (it.dateAdded.toString().length < 13) it.dateAdded * 1000L else it.dateAdded
+        }
+        SortField.PLAYED_TIME -> sortedBy {
+            historyMap[it.uri]?.lastPlayedAt ?: it.lastPlayedAt ?: it.playedTime ?: 0L
+        }
         SortField.LENGTH -> sortedBy { it.duration }
         SortField.SIZE -> sortedBy { it.size }
-        SortField.RESOLUTION -> sortedBy { it.resolution ?: "" }
-        SortField.PATH -> sortedBy { it.path.lowercase() }
-        SortField.FRAME_RATE -> sortedBy { it.frameRate ?: 0f }
-        SortField.TYPE -> sortedBy { it.title.substringAfterLast(".", "").lowercase() }
     }
     return if (direction == SortDirection.DESCENDING) sorted.reversed() else sorted
 }
 
-fun Video.getSectionLabel(sortField: SortField): String {
+fun Video.getSectionLabel(
+    sortField: SortField,
+    historyMap: Map<String, WatchHistory> = emptyMap()
+): String {
     return when (sortField) {
         SortField.TITLE -> {
             val firstChar = title.trim().firstOrNull()?.uppercaseChar()
@@ -83,8 +89,9 @@ fun Video.getSectionLabel(sortField: SortField): String {
                 }
             }
         }
-        SortField.PLAYED_TIME, SortField.STATUS -> {
-            if (playedTime == null || playedTime <= 0L) "Unwatched" else "Played"
+        SortField.PLAYED_TIME -> {
+            val lastPlayed = historyMap[uri]?.lastPlayedAt ?: lastPlayedAt ?: playedTime ?: 0L
+            if (lastPlayed <= 0L) "Unwatched" else "Played"
         }
         SortField.LENGTH -> {
             val minutes = duration / 60000
@@ -100,32 +107,6 @@ fun Video.getSectionLabel(sortField: SortField): String {
                 size >= 1024L * 1024L -> "${size / (1024 * 1024)} MB"
                 else -> "< 1 MB"
             }
-        }
-        SortField.RESOLUTION -> {
-            val res = resolution
-            if (!res.isNullOrBlank()) {
-                val parts = res.split("x")
-                if (parts.size == 2) {
-                    val height = parts[1].toIntOrNull() ?: 0
-                    when {
-                        height >= 2160 -> "4K"
-                        height >= 1080 -> "1080p"
-                        height >= 720 -> "720p"
-                        height >= 480 -> "480p"
-                        height > 0 -> "${height}p"
-                        else -> res
-                    }
-                } else res
-            } else "Unknown"
-        }
-        SortField.PATH -> folderName.ifBlank { "Videos" }
-        SortField.FRAME_RATE -> {
-            val fps = frameRate?.roundToInt() ?: 0
-            if (fps > 0) "${fps} fps" else "FPS"
-        }
-        SortField.TYPE -> {
-            val ext = title.substringAfterLast(".", "").uppercase()
-            if (ext.isNotBlank()) ext else "VIDEO"
         }
     }
 }

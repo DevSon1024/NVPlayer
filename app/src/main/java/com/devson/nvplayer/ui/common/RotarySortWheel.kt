@@ -447,15 +447,10 @@ private fun SortOrderButton(
 
 fun getSortDirectionLabels(field: SortField): Pair<String, String> {
     return when (field) {
-        SortField.TITLE -> "A to z" to "Z to a"
+        SortField.TITLE -> "A to Z" to "Z to A"
         SortField.DATE -> "Oldest" to "Newest"
         SortField.PLAYED_TIME -> "Oldest" to "Newest"
-        SortField.STATUS -> "Asc" to "Desc"
         SortField.LENGTH -> "Shortest" to "Longest"
         SortField.SIZE -> "Smallest" to "Largest"
-        SortField.RESOLUTION -> "Lowest" to "Highest"
-        SortField.PATH -> "Asc" to "Desc"
-        SortField.FRAME_RATE -> "Lowest" to "Highest"
-        SortField.TYPE -> "Asc" to "Desc"
     }
 }

@@ -371,12 +371,12 @@ fun VideoListScreen(
                                 ViewMode.ALL_FOLDERS -> if (selectedFolder != null) (videosByFolder[selectedFolder] ?: emptyList()) else videosFlat
                                 ViewMode.FOLDERS -> explorerItems.filterIsInstance<ExplorerItem.VideoItem>().map { it.video }
                             }
-                            viewVideos.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                            viewVideos.applySort(viewSettings.sortField, viewSettings.sortDirection, historyMap)
                         }
                         selectedFolders.isNotEmpty() -> {
                             val folderIds = selectedFolders.map { it.id }
                             videosFlat.filter { video -> folderIds.any { id -> video.path.startsWith(id) } }
-                                .applySort(viewSettings.sortField, viewSettings.sortDirection)
+                                .applySort(viewSettings.sortField, viewSettings.sortDirection, historyMap)
                         }
                         else -> {
                             val viewVideos = when (viewSettings.viewMode) {
@@ -384,7 +384,7 @@ fun VideoListScreen(
                                 ViewMode.ALL_FOLDERS -> if (selectedFolder != null) (videosByFolder[selectedFolder] ?: emptyList()) else videosFlat
                                 ViewMode.FOLDERS -> explorerItems.filterIsInstance<ExplorerItem.VideoItem>().map { it.video }
                             }
-                            viewVideos.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                            viewVideos.applySort(viewSettings.sortField, viewSettings.sortDirection, historyMap)
                         }
                     }
                     val startIdx = if (selectedVideos.isNotEmpty()) {
@@ -542,14 +542,14 @@ fun VideoListScreen(
                     onPlay = {
                         video?.let { vid ->
                             val playlist = when (viewSettings.viewMode) {
-                                ViewMode.FILES -> allVideosFlat.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                                ViewMode.FILES -> allVideosFlat.applySort(viewSettings.sortField, viewSettings.sortDirection, historyMap)
                                 ViewMode.ALL_FOLDERS -> if (selectedFolder != null) {
-                                    (videosByFolder[selectedFolder] ?: emptyList()).applySort(viewSettings.sortField, viewSettings.sortDirection)
+                                    (videosByFolder[selectedFolder] ?: emptyList()).applySort(viewSettings.sortField, viewSettings.sortDirection, historyMap)
                                 } else {
-                                    allVideosFlat.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                                    allVideosFlat.applySort(viewSettings.sortField, viewSettings.sortDirection, historyMap)
                                 }
                                 ViewMode.FOLDERS -> {
-                                    allVideosFlat.filter { it.path.startsWith(currentExplorerPath) }.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                                    allVideosFlat.filter { it.path.startsWith(currentExplorerPath) }.applySort(viewSettings.sortField, viewSettings.sortDirection, historyMap)
                                 }
                             }
                             onVideoSelected(vid, playlist, lastHistoryEntry?.lastPositionMs ?: 0L)
@@ -654,8 +654,8 @@ fun VideoListScreen(
                                     )
                                 } else {
                                     val videos = videosByFolder[folder] ?: emptyList()
-                                    val sortedVideos = remember(videos, viewSettings.sortField, viewSettings.sortDirection) {
-                                        videos.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                                    val sortedVideos = remember(videos, viewSettings.sortField, viewSettings.sortDirection, historyMap) {
+                                        videos.applySort(viewSettings.sortField, viewSettings.sortDirection, historyMap)
                                     }
                                     VideoListContent(
                                         videos = sortedVideos,
@@ -681,8 +681,8 @@ fun VideoListScreen(
                         }
                         ViewMode.FILES -> {
                             val allVideos = videosFlat
-                            val sortedVideos = remember(allVideos, viewSettings.sortField, viewSettings.sortDirection) {
-                                allVideos.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                            val sortedVideos = remember(allVideos, viewSettings.sortField, viewSettings.sortDirection, historyMap) {
+                                allVideos.applySort(viewSettings.sortField, viewSettings.sortDirection, historyMap)
                             }
                             VideoListContent(
                                 videos = sortedVideos,
@@ -706,7 +706,7 @@ fun VideoListScreen(
                         }
                         ViewMode.FOLDERS -> {
                             val allVideosForSize = videosFlat
-                            val sortedItems = remember(explorerItems, viewSettings.sortField, viewSettings.sortDirection, allVideosForSize) {
+                            val sortedItems = remember(explorerItems, viewSettings.sortField, viewSettings.sortDirection, allVideosForSize, historyMap) {
                                 val folders = explorerItems.filterIsInstance<ExplorerItem.FolderItem>().map { it.folder }
                                 val videos = explorerItems.filterIsInstance<ExplorerItem.VideoItem>().map { it.video }
                                 
@@ -714,8 +714,8 @@ fun VideoListScreen(
                                     allVideosForSize.filter { it.path.startsWith(folder.id) }
                                 }
                                 
-                                val sortedFolders = folders.applyFolderSort(folderVideosMap, viewSettings.sortField, viewSettings.sortDirection)
-                                val sortedVideos = videos.applySort(viewSettings.sortField, viewSettings.sortDirection)
+                                val sortedFolders = folders.applyFolderSort(folderVideosMap, viewSettings.sortField, viewSettings.sortDirection, historyMap)
+                                val sortedVideos = videos.applySort(viewSettings.sortField, viewSettings.sortDirection, historyMap)
                                 
                                 sortedFolders.map { ExplorerItem.FolderItem(it) } + sortedVideos.map { ExplorerItem.VideoItem(it) }
                             }

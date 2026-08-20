@@ -137,7 +137,7 @@ fun VideoListContent(
         FastScrollerOverlay(
             itemCount = videos.size,
             sectionTextExtractor = { index ->
-                videos.getOrNull(index)?.getSectionLabel(settings.sortField) ?: ""
+                videos.getOrNull(index)?.getSectionLabel(settings.sortField, historyMap) ?: ""
             },
             listState = if (settings.layoutMode == LayoutMode.GRID) null else listState,
             gridState = if (settings.layoutMode == LayoutMode.GRID) gridState else null,
