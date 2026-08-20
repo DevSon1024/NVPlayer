@@ -7,19 +7,23 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.RestoreFromTrash
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,20 +32,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.ui.res.stringResource
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.devson.nvplayer.R
-import com.devson.nvplayer.domain.model.SortField
 import com.devson.nvplayer.domain.model.Video
-import com.devson.nvplayer.domain.model.getSectionLabel
-import com.devson.nvplayer.ui.common.components.FastScrollerOverlay
 import com.devson.nvplayer.util.formatDate
+import com.devson.nvplayer.util.formatDuration
 import com.devson.nvplayer.util.formatSize
 import com.devson.nvplayer.viewmodel.FileOperationsViewModel
 import com.devson.nvplayer.viewmodel.RecycleBinViewModel
@@ -53,10 +56,11 @@ fun RecycleBinScreen(
     viewModel: RecycleBinViewModel = viewModel(),
     fileOpsViewModel: FileOperationsViewModel = viewModel()
 ) {
-    val context = LocalContext.current
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val trashedVideos by viewModel.trashedVideos.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    
+    val context = LocalContext.current
+
     var selectedVideos by remember { mutableStateOf(emptySet<Video>()) }
     val isSelectionActive = selectedVideos.isNotEmpty()
     var showInfoDialog by remember { mutableStateOf(false) }
@@ -103,18 +107,21 @@ fun RecycleBinScreen(
         selectedVideos = emptySet()
     }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                title = { 
+                title = {
                     if (isSelectionActive) {
-                        Text(
-                            text = stringResource(R.string.selection_items_count, selectedVideos.size, trashedVideos.size),
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "${selectedVideos.size} of ${trashedVideos.size} selected",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     } else {
                         Text(
                             text = stringResource(R.string.recycle_bin_title),
@@ -127,156 +134,181 @@ fun RecycleBinScreen(
                         if (isSelectionActive) selectedVideos = emptySet()
                         else onBack()
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                        Icon(
+                            imageVector = if (isSelectionActive) Icons.Default.Close else Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back)
+                        )
                     }
                 },
                 actions = {
                     if (isSelectionActive) {
                         IconButton(onClick = {
-                            if (selectedVideos.size == trashedVideos.size) {
-                                selectedVideos = emptySet()
+                            selectedVideos = if (selectedVideos.size == trashedVideos.size) {
+                                emptySet()
                             } else {
-                                selectedVideos = trashedVideos.toSet()
+                                trashedVideos.toSet()
                             }
                         }) {
-                            Text(stringResource(R.string.action_all), modifier = Modifier.padding(8.dp))
+                            Icon(
+                                imageVector = if (selectedVideos.size == trashedVideos.size) Icons.Default.Deselect else Icons.Default.SelectAll,
+                                contentDescription = stringResource(R.string.action_all)
+                            )
                         }
                     } else {
                         IconButton(onClick = { showInfoDialog = true }) {
-                            Icon(Icons.Filled.Info, contentDescription = stringResource(R.string.action_info))
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = stringResource(R.string.action_info)
+                            )
                         }
                     }
                 },
+                scrollBehavior = scrollBehavior,
                 colors = TopAppBarDefaults.largeTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     scrolledContainerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
                     navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
                     actionIconContentColor = MaterialTheme.colorScheme.onBackground
-                ),
-                scrollBehavior = scrollBehavior
+                )
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            if (isSelectionActive) {
-                BottomAppBar(
-                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
+            AnimatedVisibility(
+                visible = isSelectionActive,
+                enter = slideInVertically { it } + fadeIn(),
+                exit = slideOutVertically { it } + fadeOut()
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        TextButton(
+                        // Restore Button
+                        Button(
                             onClick = {
                                 val uris = selectedVideos.mapNotNull { runCatching { Uri.parse(it.uri) }.getOrNull() }
                                 fileOpsViewModel.restoreVideos(context, uris)
-                            }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         ) {
-                            Icon(Icons.Filled.RestoreFromTrash, contentDescription = stringResource(R.string.action_restore))
+                            Icon(
+                                imageVector = Icons.Default.RestoreFromTrash,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.action_restore))
+                            Text(
+                                text = "Restore (${selectedVideos.size})",
+                                fontWeight = FontWeight.Bold
+                            )
                         }
-                        TextButton(
+
+                        // Delete Permanently Button
+                        Button(
                             onClick = { showDeleteConfirmDialog = true },
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            )
                         ) {
-                            Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete_permanently))
+                            Icon(
+                                imageVector = Icons.Default.DeleteForever,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.action_delete))
+                            Text(
+                                text = "Delete (${selectedVideos.size})",
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
             }
         }
     ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             if (opInProgress) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(top = padding.calculateTopPadding()))
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .padding(top = padding.calculateTopPadding())
+                )
             }
 
             if (isLoading && trashedVideos.isEmpty()) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (trashedVideos.isEmpty()) {
-                Column(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = stringResource(R.string.recycle_bin_empty),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                EmptyRecycleBinView(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(horizontal = 32.dp)
+                )
             } else {
-                val listState = rememberLazyListState()
-                Box(modifier = Modifier.fillMaxSize()) {
-                    LazyColumn(
-                        state = listState,
-                        contentPadding = PaddingValues(
-                            start = 16.dp,
-                            end = 16.dp,
-                            top = padding.calculateTopPadding() + 16.dp,
-                            bottom = padding.calculateBottomPadding() + 32.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(
-                            items = trashedVideos,
-                            key = { it.uri },
-                            contentType = { "trashed_video" }
-                        ) { video ->
-                            val isSelected = selectedVideos.contains(video)
-                            val onLongClick = remember(video, isSelected) {
-                                {
-                                    selectedVideos = if (isSelected) {
-                                        selectedVideos - video
-                                    } else {
-                                        selectedVideos + video
-                                    }
-                                }
-                            }
-                            val onClick = remember(video, isSelected, isSelectionActive) {
-                                {
-                                    if (isSelectionActive) {
-                                        selectedVideos = if (isSelected) {
-                                            selectedVideos - video
-                                        } else {
-                                            selectedVideos + video
-                                        }
-                                    } else {
-                                        Toast.makeText(context, context.getString(R.string.recycle_bin_select_prompt), Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                            TrashedVideoItem(
-                                video = video,
-                                isSelected = isSelected,
-                                onLongClick = onLongClick,
-                                onClick = onClick
-                            )
-                        }
+                LazyColumn(
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = padding.calculateTopPadding() + 8.dp,
+                        bottom = padding.calculateBottomPadding() + if (isSelectionActive) 80.dp else 24.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Informational Summary Card
+                    item {
+                        RecycleBinSummaryCard(
+                            totalCount = trashedVideos.size,
+                            totalSizeBytes = remember(trashedVideos) { trashedVideos.sumOf { it.size } }
+                        )
                     }
 
-                    FastScrollerOverlay(
-                        itemCount = trashedVideos.size,
-                        sectionTextExtractor = { index ->
-                            trashedVideos.getOrNull(index)?.getSectionLabel(SortField.DATE) ?: ""
-                        },
-                        listState = listState,
-                        topPadding = padding.calculateTopPadding(),
-                        bottomPadding = padding.calculateBottomPadding()
-                    )
+                    items(
+                        items = trashedVideos,
+                        key = { it.uri },
+                        contentType = { "trashed_video" }
+                    ) { video ->
+                        val isSelected = selectedVideos.contains(video)
+                        val toggleSelection = {
+                            selectedVideos = if (isSelected) {
+                                selectedVideos - video
+                            } else {
+                                selectedVideos + video
+                            }
+                        }
+
+                        TrashedVideoItem(
+                            video = video,
+                            isSelected = isSelected,
+                            onLongClick = toggleSelection,
+                            onClick = {
+                                if (isSelectionActive) {
+                                    toggleSelection()
+                                } else {
+                                    // Start selection mode easily on tap
+                                    selectedVideos = setOf(video)
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -285,10 +317,30 @@ fun RecycleBinScreen(
     if (showInfoDialog) {
         AlertDialog(
             onDismissRequest = { showInfoDialog = false },
-            title = { Text(stringResource(R.string.recycle_bin_title)) },
-            text = { Text(stringResource(R.string.recycle_bin_info_desc)) },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = {
+                Text(
+                    text = "About Recycle Bin",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Videos deleted from Open Player are safely preserved in the Android system trash for up to 30 days.\n\nYou can restore videos back to their original folders or permanently delete them at any time.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
             confirmButton = {
-                TextButton(onClick = { showInfoDialog = false }) { Text(stringResource(R.string.ok)) }
+                TextButton(onClick = { showInfoDialog = false }) {
+                    Text(stringResource(R.string.ok), fontWeight = FontWeight.Bold)
+                }
             }
         )
     }
@@ -296,23 +348,134 @@ fun RecycleBinScreen(
     if (showDeleteConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmDialog = false },
-            title = { Text(stringResource(R.string.recycle_bin_delete_confirm_title)) },
-            text = { Text(stringResource(R.string.recycle_bin_delete_confirm_desc)) },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.DeleteForever,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = {
+                Text(
+                    text = "Delete Permanently?",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to permanently delete ${selectedVideos.size} selected video(s)? This action cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         val uris = selectedVideos.mapNotNull { runCatching { Uri.parse(it.uri) }.getOrNull() }
                         fileOpsViewModel.deleteVideos(context, uris, trash = false)
                         showDeleteConfirmDialog = false
                     },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
                 ) {
-                    Text(stringResource(R.string.action_delete))
+                    Text("Delete Forever", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirmDialog = false }) { Text(stringResource(R.string.dialog_cancel)) }
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text(stringResource(R.string.dialog_cancel))
+                }
             }
+        )
+    }
+}
+
+@Composable
+private fun RecycleBinSummaryCard(
+    totalCount: Int,
+    totalSizeBytes: Long
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AutoDelete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Auto-removal in 30 days",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "$totalCount video(s) • ${formatSize(totalSizeBytes)} total storage",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyRecycleBinView(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.DeleteSweep,
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Text(
+            text = "Recycle Bin is Empty",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            text = "Deleted videos are safely retained for up to 30 days before permanent deletion.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
         )
     }
 }
@@ -325,33 +488,39 @@ private fun TrashedVideoItem(
     onLongClick: () -> Unit,
     onClick: () -> Unit
 ) {
-    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
     val formattedSize = remember(video.size) { formatSize(video.size) }
     val formattedDate = remember(video.dateAdded) { formatDate(video.dateAdded) }
+    val formattedDuration = remember(video.duration) { if (video.duration > 0L) formatDuration(video.duration) else null }
     val daysLeft = remember(video.dateExpires) {
         val expiresMs = video.dateExpires ?: 0L
         val diffMs = expiresMs - System.currentTimeMillis()
         if (diffMs > 0) (diffMs / (1000 * 60 * 60 * 24)).toInt() else 0
     }
 
-    ElevatedCard(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(16.dp),
+        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+        tonalElevation = if (isSelected) 4.dp else 1.dp
     ) {
         Row(
-            modifier = Modifier.background(backgroundColor),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Thumbnail container
             Box(
                 modifier = Modifier
-                    .size(width = 120.dp, height = 80.dp)
-                    .background(MaterialTheme.colorScheme.surfaceDim)
+                    .size(width = 112.dp, height = 74.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -362,28 +531,68 @@ private fun TrashedVideoItem(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
+
+                // Days left badge
                 if (video.dateExpires != null && video.dateExpires > 0L) {
-                    Box(
+                    val isUrgent = daysLeft <= 5
+                    Surface(
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .padding(4.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f))
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .padding(4.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (isUrgent) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
                     ) {
                         Text(
-                            text = stringResource(R.string.recycle_bin_days_left, daysLeft),
+                            text = if (daysLeft == 0) "Today" else "${daysLeft}d left",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            fontWeight = FontWeight.Bold
+                            color = if (isUrgent) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                // Duration badge
+                if (formattedDuration != null) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(4.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                    ) {
+                        Text(
+                            text = formattedDuration,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
+                    }
+                }
+
+                // Selected Checkmark Overlay
+                if (isSelected) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Selected",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }
             }
+
+            // Text metadata
             Column(
-                modifier = Modifier
-                    .padding(12.dp)
-                    .weight(1f)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = video.title,
@@ -391,17 +600,24 @@ private fun TrashedVideoItem(
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         text = formattedSize,
                         style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
                     )
                     Text(
                         text = formattedDate,
