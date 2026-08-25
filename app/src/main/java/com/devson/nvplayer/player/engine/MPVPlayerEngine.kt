@@ -105,6 +105,11 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
             MPVLib.setOptionString("hwdec", "auto-safe")
             MPVLib.setOptionString("profile", "fast")
 
+            // Subtitle rendering options: render natively on MPV surface and disable secondary-sid mirroring
+            MPVLib.setOptionString("sub-visibility", "yes")
+            MPVLib.setOptionString("secondary-sid", "no")
+            MPVLib.setOptionString("sub-auto", "fuzzy")
+
             // Keep native player responsive and smooth
             MPVLib.setOptionString("keep-open", "yes")
 
@@ -221,6 +226,8 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
             MPVLib.setPropertyString("glsl-shaders", "")
             MPVLib.setPropertyDouble("video-scale-x", 1.0)
             MPVLib.setPropertyDouble("video-scale-y", 1.0)
+            MPVLib.setPropertyString("sub-visibility", "yes")
+            MPVLib.setPropertyString("secondary-sid", "no")
 
             Log.d("MPVPlayerEngine", "MPVLib initialized successfully")
         } catch (e: Exception) {
@@ -250,7 +257,9 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
             try { MPVLib.command("stop") } catch (_: Exception) {}
             MPVLib.command("loadfile", uriString)
             MPVLib.setPropertyBoolean("pause", false) // Auto-play the loaded media file
+            MPVLib.setPropertyString("secondary-sid", "no")
             val settings = settingsRepo.playbackSettingsFlow.value
+            applySubtitleSettings(settings)
             setAmbientMode(settings.isAmbientModeEnabled, settings.ambientBlurStyle)
         } catch (e: Exception) {
             Log.e("MPVPlayerEngine", "Failed to load file via MPVLib", e)
@@ -308,7 +317,14 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
     override fun cycleSubtitle() {
         Log.d("MPVPlayerEngine", "Cycling subtitle")
         try {
+            MPVLib.setPropertyString("secondary-sid", "no")
             MPVLib.command("cycle", "sid")
+            val currentSid = MPVLib.getPropertyString("sid")
+            if (currentSid == "no" || currentSid.isNullOrEmpty()) {
+                MPVLib.setPropertyString("sub-visibility", "no")
+            } else {
+                MPVLib.setPropertyString("sub-visibility", "yes")
+            }
             updateTracks()
         } catch (e: Exception) {
             Log.e("MPVPlayerEngine", "Failed to cycle subtitle", e)
@@ -328,6 +344,7 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
     override fun selectSubtitleTrack(id: Int) {
         Log.d("MPVPlayerEngine", "Selecting subtitle track ID: $id")
         try {
+            MPVLib.setPropertyString("secondary-sid", "no")
             if (id == -1) {
                 MPVLib.setPropertyString("sid", "no")
                 MPVLib.setPropertyString("sub-visibility", "no")
@@ -348,8 +365,10 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
             val file = java.io.File(path)
             val title = file.name.substringBeforeLast('.')
             val flag = if (select) "select" else "auto"
+            MPVLib.setPropertyString("secondary-sid", "no")
             MPVLib.command("sub-add", path, flag, title)
             if (select) {
+                MPVLib.setPropertyString("secondary-sid", "no")
                 MPVLib.setPropertyString("sub-visibility", "yes")
             }
             updateTracks()
@@ -400,6 +419,68 @@ class MPVPlayerEngine(private val context: Context) : PlayerEngine, MPVLib.Event
             MPVLib.setPropertyString("sub-bold", if (bold) "yes" else "no")
         } catch (e: Exception) {
             Log.e("MPVPlayerEngine", "Failed to set subtitle style", e)
+        }
+    }
+
+    override fun applySubtitleSettings(settings: com.devson.nvplayer.data.repository.PlaybackSettings) {
+        Log.d("MPVPlayerEngine", "Applying subtitle settings to native MPV engine: $settings")
+        try {
+            // Subtitle size scaling
+            MPVLib.setPropertyDouble("sub-scale", settings.subtitleTextSizeScale.toDouble())
+            MPVLib.setPropertyDouble("sub-font-size", 55.0)
+
+            // Subtitle delay
+            MPVLib.setPropertyDouble("sub-delay", settings.subtitleDelayMs / 1000.0)
+
+            // Subtitle vertical position (0.0 = bottom (100%), 0.85 = top (15%))
+            val pos = (100 - (settings.subtitleVerticalOffset * 100).toInt()).coerceIn(0, 100)
+            MPVLib.setPropertyInt("sub-pos", pos)
+
+            // Subtitle font family
+            val fontName = when (settings.subtitleFont) {
+                com.devson.nvplayer.data.repository.SubtitleFont.DEFAULT -> "sans-serif"
+                com.devson.nvplayer.data.repository.SubtitleFont.MONOSPACE -> "monospace"
+                com.devson.nvplayer.data.repository.SubtitleFont.SANS_SERIF -> "sans-serif"
+                com.devson.nvplayer.data.repository.SubtitleFont.SERIF -> "serif"
+            }
+            MPVLib.setPropertyString("sub-font", fontName)
+
+            // Subtitle bold weight
+            MPVLib.setPropertyString("sub-bold", if (settings.isSubtitleBold) "yes" else "no")
+
+            // Subtitle force ASS / SSA override
+            MPVLib.setPropertyString("sub-ass-override", if (settings.forceAssSubtitleOverride) "force" else "scale")
+
+            // Subtitle background and border styling
+            when (settings.subtitleBgStyle) {
+                0 -> {
+                    // None (transparent background with standard outline & shadow)
+                    MPVLib.setPropertyString("sub-color", "#FFFFFFFF")
+                    MPVLib.setPropertyString("sub-border-color", "#FF000000")
+                    MPVLib.setPropertyDouble("sub-border-size", 2.5)
+                    MPVLib.setPropertyDouble("sub-shadow-offset", 1.0)
+                    MPVLib.setPropertyString("sub-shadow-color", "#80000000")
+                    MPVLib.setPropertyString("sub-back-color", "#00000000")
+                }
+                1 -> {
+                    // Glass / Translucent black background box
+                    MPVLib.setPropertyString("sub-color", "#FFFFFFFF")
+                    MPVLib.setPropertyString("sub-border-color", "#FF000000")
+                    MPVLib.setPropertyDouble("sub-border-size", 1.5)
+                    MPVLib.setPropertyDouble("sub-shadow-offset", 0.0)
+                    MPVLib.setPropertyString("sub-back-color", "#80000000")
+                }
+                2 -> {
+                    // Solid black background box
+                    MPVLib.setPropertyString("sub-color", "#FFFFFFFF")
+                    MPVLib.setPropertyString("sub-border-color", "#00000000")
+                    MPVLib.setPropertyDouble("sub-border-size", 0.0)
+                    MPVLib.setPropertyDouble("sub-shadow-offset", 0.0)
+                    MPVLib.setPropertyString("sub-back-color", "#FF000000")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MPVPlayerEngine", "Failed to apply subtitle settings to MPVLib", e)
         }
     }
 

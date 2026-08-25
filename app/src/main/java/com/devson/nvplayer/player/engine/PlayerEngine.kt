@@ -38,6 +38,7 @@ interface PlayerEngine {
     fun selectChapter(index: Int)
     fun setSubtitleDelay(delayMs: Long)
     fun setSubtitleStyle(scale: Float, font: String, bold: Boolean)
+    fun applySubtitleSettings(settings: com.devson.nvplayer.data.repository.PlaybackSettings)
     fun seekNextSubtitle()
     fun seekPrevSubtitle()
     fun addExternalSubtitle(path: String, select: Boolean = true)

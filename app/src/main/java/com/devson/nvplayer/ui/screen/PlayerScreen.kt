@@ -57,7 +57,6 @@ import android.provider.MediaStore
 import com.devson.nvplayer.ui.common.SubtitleSettingsSideSheet
 import com.devson.nvplayer.ui.common.sheets.AudioSettingsSideSheet
 import com.devson.nvplayer.ui.common.sheets.QualitySettingsSideSheet
-import com.devson.nvplayer.ui.common.ComposeSubtitleOverlay
 import com.devson.nvplayer.ui.common.sheets.PlayerSettingsSideSheet
 import com.devson.nvplayer.ui.common.sheets.EnhanceSettingsSideSheet
 import com.devson.nvplayer.player.model.ChapterInfo
@@ -734,21 +733,6 @@ fun PlayerScreen(
                         )
                     }
                 }
-
-                ComposeSubtitleOverlay(
-                    subtitleText = currentSubtitleText,
-                    textSizeScale = playbackSettings.subtitleTextSizeScale,
-                    bgStyle = playbackSettings.subtitleBgStyle,
-                    subtitleFont = playbackSettings.subtitleFont,
-                    isSubtitleBold = playbackSettings.isSubtitleBold,
-                    isSubtitleGestureEnabled = playbackSettings.subtitleGesturesEnabled && !isInPipMode,
-                    verticalOffsetFraction = playbackSettings.subtitleVerticalOffset,
-                    onVerticalOffsetFractionChanged = { offset ->
-                        onUpdateSubtitleVerticalOffset(offset)
-                    },
-                    onSeekNext = onSeekNextSubtitle,
-                    onSeekPrev = onSeekPrevSubtitle
-                )
 
                 if (!isInPipMode) {
                     // Top overlays: PersistentTopBar and/or SpeedSliderHUD

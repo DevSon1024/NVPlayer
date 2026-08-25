@@ -350,6 +350,28 @@ class PlayerViewModel(
             }
         }
 
+        // Observe subtitle settings changes and apply immediately to native MPV engine
+        viewModelScope.launch {
+            playbackSettings
+                .map {
+                    listOf<Any>(
+                        it.subtitleTextSizeScale,
+                        it.subtitleDelayMs,
+                        it.subtitleVerticalOffset,
+                        it.subtitleFont,
+                        it.isSubtitleBold,
+                        it.forceAssSubtitleOverride,
+                        it.subtitleBgStyle
+                    )
+                }
+                .distinctUntilChanged()
+                .collect {
+                    if (isVideoLoaded) {
+                        playerEngine.applySubtitleSettings(playbackSettings.value)
+                    }
+                }
+        }
+
         viewModelScope.launch {
             playerEngine.networkSpeedBytesPerSec.collect { speed ->
                 networkSpeedBytesPerSec.value = speed
@@ -564,6 +586,9 @@ class PlayerViewModel(
 
             // Apply smart enhance settings
             applyEnhanceSettings(playbackSettings.value)
+
+            // Apply saved subtitle settings
+            playerEngine.applySubtitleSettings(playbackSettings.value)
         }
     }
 
