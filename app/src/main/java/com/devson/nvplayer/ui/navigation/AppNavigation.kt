@@ -23,6 +23,7 @@ import com.devson.nvplayer.ui.screen.settings.AppearanceSettingsScreen
 import com.devson.nvplayer.ui.screen.settings.RecycleBinScreen
 import com.devson.nvplayer.ui.screen.settings.GestureSettingsScreen
 import com.devson.nvplayer.ui.screen.settings.CustomProfileSettingsScreen
+import com.devson.nvplayer.ui.screen.settings.StorageAnalyzeScreen
 import com.devson.nvplayer.ui.screen.settings.PlayerInterfaceSettingsScreen
 import com.devson.nvplayer.ui.screen.settings.AboutScreen
 import com.devson.nvplayer.ui.screen.settings.CreditsScreen
@@ -363,6 +364,7 @@ fun AppNavigation(
                 onNavigateToGestures = { navController.navigate("gestures") { launchSingleTop = true } },
                 onNavigateToProfile = { navController.navigate("profile") { launchSingleTop = true } },
                 onNavigateToCustomHome = { navController.navigate("custom_profile") { launchSingleTop = true } },
+                onNavigateToStorageAnalyzer = { navController.navigate("storage_analyzer") { launchSingleTop = true } },
                 onNavigateToPlayerInterface = { navController.navigate("player_interface") { launchSingleTop = true } },
                 onNavigateToScanFolders = { navController.navigate("folder_settings") { launchSingleTop = true } },
                 onNavigateToTool = { navController.navigate("tools") { launchSingleTop = true } },
@@ -559,6 +561,40 @@ fun AppNavigation(
             CustomProfileSettingsScreen(
                 onNavigateBack = safePopBackStack,
                 settingsViewModel = settingsViewModel
+            )
+        }
+
+        composable("storage_analyzer") {
+            StorageAnalyzeScreen(
+                onNavigateBack = safePopBackStack,
+                onPlayVideo = { uri ->
+                    val playerVm = playerViewModel()
+                    val flatVideos = videoListViewModel.videosFlat.value
+                    val currentVideo = flatVideos.find { it.uri == uri.toString() } ?: Video(
+                        uri = uri.toString(),
+                        title = uri.lastPathSegment?.substringBeforeLast('.') ?: "Video",
+                        duration = 0L,
+                        folderName = "",
+                        path = uri.path ?: "",
+                        size = 0L,
+                        width = 0,
+                        height = 0
+                    )
+                    val queueVideos = getLogicalQueue(
+                        video = currentVideo,
+                        playlist = listOf(currentVideo),
+                        flatVideos = flatVideos,
+                        currentViewMode = videoListViewModel.viewSettings.value.viewMode,
+                        sortField = videoListViewModel.viewSettings.value.sortField,
+                        sortDirection = videoListViewModel.viewSettings.value.sortDirection
+                    )
+                    playerVm.setQueue(queueVideos)
+                    playerVm.prepareVideo(uri, queueVideos.map { Uri.parse(it.uri) })
+                    navController.navigate("player") {
+                        launchSingleTop = true
+                    }
+                },
+                videoListViewModel = videoListViewModel
             )
         }
 

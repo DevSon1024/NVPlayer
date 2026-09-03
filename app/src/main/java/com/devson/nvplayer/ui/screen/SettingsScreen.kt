@@ -46,6 +46,7 @@ fun SettingsScreen(
     onNavigateToPlayerInterface: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
     onNavigateToCustomHome: () -> Unit = {},
+    onNavigateToStorageAnalyzer: () -> Unit = {},
     onNavigateToGestures: () -> Unit = {},
     onNavigateToYtdlpSettings: () -> Unit = {},
     onNavigateToMpvConfig: () -> Unit = {},
@@ -218,6 +219,16 @@ fun SettingsScreen(
                             title = "Recycle Bin",
                             subtitle = "Manage deleted videos",
                             onClick = onNavigateToRecycleBin
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsItemRow(
+                            icon = Icons.Default.Analytics,
+                            title = "Storage Analyzer",
+                            subtitle = "Inspect video space usage and disk capacity",
+                            onClick = onNavigateToStorageAnalyzer
                         )
                     }
                 }
