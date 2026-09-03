@@ -47,6 +47,7 @@ fun SettingsScreen(
     onNavigateToProfile: () -> Unit = {},
     onNavigateToCustomHome: () -> Unit = {},
     onNavigateToStorageAnalyzer: () -> Unit = {},
+    onNavigateToVault: () -> Unit = {},
     onNavigateToGestures: () -> Unit = {},
     onNavigateToYtdlpSettings: () -> Unit = {},
     onNavigateToMpvConfig: () -> Unit = {},
@@ -229,6 +230,16 @@ fun SettingsScreen(
                             title = "Storage Analyzer",
                             subtitle = "Inspect video space usage and disk capacity",
                             onClick = onNavigateToStorageAnalyzer
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsItemRow(
+                            icon = Icons.Default.Lock,
+                            title = "Privacy Vault",
+                            subtitle = "Encrypted storage for private videos",
+                            onClick = onNavigateToVault
                         )
                     }
                 }

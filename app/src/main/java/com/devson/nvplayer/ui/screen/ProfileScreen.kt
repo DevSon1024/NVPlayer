@@ -73,7 +73,8 @@ fun ProfileScreen(
     onBrowseClick: () -> Unit,
     onFeedClick: () -> Unit,
     onSeeMoreHistoryClick: () -> Unit,
-    onStorageAnalyzerClick: () -> Unit = {}
+    onStorageAnalyzerClick: () -> Unit = {},
+    onVaultClick: () -> Unit = {}
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val context = LocalContext.current
@@ -331,6 +332,31 @@ fun ProfileScreen(
                                         containerColor = MaterialTheme.colorScheme.errorContainer,
                                         iconColor = MaterialTheme.colorScheme.onErrorContainer,
                                         onClick = onRecycleBinClick,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    QuickActionCardBentoSmall(
+                                        title = "Privacy Vault",
+                                        subtitle = "Encrypted private files",
+                                        icon = Icons.Default.Lock,
+                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                        iconColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                        onClick = onVaultClick,
+                                        modifier = Modifier.weight(1f)
+                                    )
+
+                                    QuickActionCardBentoSmall(
+                                        title = "Storage",
+                                        subtitle = "Analyze media space",
+                                        icon = Icons.Default.Analytics,
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        iconColor = MaterialTheme.colorScheme.primary,
+                                        onClick = onStorageAnalyzerClick,
                                         modifier = Modifier.weight(1f)
                                     )
                                 }

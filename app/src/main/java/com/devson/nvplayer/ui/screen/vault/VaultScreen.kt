@@ -1,0 +1,51 @@
+package com.devson.nvplayer.ui.screen.vault
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.devson.nvplayer.data.database.VaultEntity
+import com.devson.nvplayer.domain.model.Video
+import com.devson.nvplayer.viewmodel.VaultAuthState
+import com.devson.nvplayer.viewmodel.VaultAuthViewModel
+import com.devson.nvplayer.viewmodel.VaultGalleryViewModel
+import java.io.File
+
+@Composable
+fun VaultScreen(
+    authViewModel: VaultAuthViewModel,
+    galleryViewModel: VaultGalleryViewModel,
+    onPlayMedia: (VaultEntity, File, Video) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val authState by authViewModel.authState.collectAsStateWithLifecycle()
+
+    AnimatedContent(
+        targetState = authState is VaultAuthState.Authenticated,
+        transitionSpec = {
+            fadeIn(animationSpec = tween(350)) togetherWith fadeOut(animationSpec = tween(250))
+        },
+        label = "vault_screen_transition",
+        modifier = modifier.fillMaxSize()
+    ) { isAuthenticated ->
+        if (isAuthenticated) {
+            VaultGalleryScreen(
+                viewModel = galleryViewModel,
+                onLockClick = { authViewModel.lockVault() },
+                onPlayMedia = onPlayMedia,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            VaultAuthScreen(
+                viewModel = authViewModel,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}

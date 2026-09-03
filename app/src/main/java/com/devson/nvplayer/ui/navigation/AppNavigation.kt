@@ -34,6 +34,12 @@ import com.devson.nvplayer.ui.screen.settings.YtdlpSettingsScreen
 import com.devson.nvplayer.ui.screen.settings.MpvConfigSettingsScreen
 import com.devson.nvplayer.ui.screen.library.LibraryHomeScreen
 import com.devson.nvplayer.ui.screen.library.SeriesDetailScreen
+import com.devson.nvplayer.ui.screen.vault.VaultScreen
+import com.devson.nvplayer.data.database.AppDatabase
+import com.devson.nvplayer.data.security.VaultFileManager
+import com.devson.nvplayer.data.security.VaultSecurityManager
+import com.devson.nvplayer.viewmodel.VaultAuthViewModel
+import com.devson.nvplayer.viewmodel.VaultGalleryViewModel
 import com.devson.nvplayer.viewmodel.LibraryViewModel
 import com.devson.nvplayer.viewmodel.HomeViewModel
 import com.devson.nvplayer.viewmodel.PlayerViewModel
@@ -91,6 +97,24 @@ fun AppNavigation(
         factory = LibraryViewModel.Factory(
             application = context.applicationContext as android.app.Application,
             videoListViewModel = videoListViewModel
+        )
+    )
+
+    val database = remember { AppDatabase.getDatabase(context) }
+    val vaultSecurityManager = remember { VaultSecurityManager(context) }
+    val vaultFileManager = remember { VaultFileManager(context, database.vaultDao()) }
+    val vaultAuthViewModel: VaultAuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+        factory = VaultAuthViewModel.Factory(
+            application = context.applicationContext as android.app.Application,
+            securityManager = vaultSecurityManager,
+            vaultFileManager = vaultFileManager
+        )
+    )
+    val vaultGalleryViewModel: VaultGalleryViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+        factory = VaultGalleryViewModel.Factory(
+            application = context.applicationContext as android.app.Application,
+            vaultDao = database.vaultDao(),
+            vaultFileManager = vaultFileManager
         )
     )
 
@@ -237,6 +261,16 @@ fun AppNavigation(
                     navController.navigate("history") {
                         launchSingleTop = true
                     }
+                },
+                onStorageAnalyzerClick = {
+                    navController.navigate("storage_analyzer") {
+                        launchSingleTop = true
+                    }
+                },
+                onVaultClick = {
+                    navController.navigate("vault") {
+                        launchSingleTop = true
+                    }
                 }
             )
         }
@@ -376,6 +410,7 @@ fun AppNavigation(
                 onNavigateToProfile = { navController.navigate("profile") { launchSingleTop = true } },
                 onNavigateToCustomHome = { navController.navigate("custom_profile") { launchSingleTop = true } },
                 onNavigateToStorageAnalyzer = { navController.navigate("storage_analyzer") { launchSingleTop = true } },
+                onNavigateToVault = { navController.navigate("vault") { launchSingleTop = true } },
                 onNavigateToPlayerInterface = { navController.navigate("player_interface") { launchSingleTop = true } },
                 onNavigateToScanFolders = { navController.navigate("folder_settings") { launchSingleTop = true } },
                 onNavigateToTool = { navController.navigate("tools") { launchSingleTop = true } },
@@ -557,6 +592,16 @@ fun AppNavigation(
                     navController.navigate("history") {
                         launchSingleTop = true
                     }
+                },
+                onStorageAnalyzerClick = {
+                    navController.navigate("storage_analyzer") {
+                        launchSingleTop = true
+                    }
+                },
+                onVaultClick = {
+                    navController.navigate("vault") {
+                        launchSingleTop = true
+                    }
                 }
             )
         }
@@ -684,6 +729,21 @@ fun AppNavigation(
                     }
                 },
                 onBack = safePopBackStack
+            )
+        }
+
+        composable("vault") {
+            VaultScreen(
+                authViewModel = vaultAuthViewModel,
+                galleryViewModel = vaultGalleryViewModel,
+                onPlayMedia = { entity, file, video ->
+                    val playerVm = playerViewModel()
+                    playerVm.setQueue(listOf(video))
+                    playerVm.prepareVideo(Uri.fromFile(file), listOf(Uri.fromFile(file)))
+                    navController.navigate("player") {
+                        launchSingleTop = true
+                    }
+                }
             )
         }
 
