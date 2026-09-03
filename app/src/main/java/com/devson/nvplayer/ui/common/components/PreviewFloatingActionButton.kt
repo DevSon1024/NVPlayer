@@ -80,7 +80,7 @@ fun PreviewFloatingActionButton(
     previewDurationMs: Long,
     previewLastPositionMs: Long,
     onPlay: () -> Unit,
-    onNetworkStreamClick: () -> Unit
+    onNetworkStreamClick: () -> Unit = {}
 ) {
     var isMenuExpanded by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }

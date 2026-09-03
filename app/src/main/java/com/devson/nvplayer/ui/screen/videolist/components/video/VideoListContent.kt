@@ -24,9 +24,9 @@ import com.devson.nvplayer.domain.model.LayoutMode
 import com.devson.nvplayer.domain.model.Video
 import com.devson.nvplayer.domain.model.ViewSettings
 import com.devson.nvplayer.domain.model.WatchHistory
-import com.devson.nvplayer.domain.model.getSectionLabel
 import com.devson.nvplayer.ui.common.components.CustomEmptyStateView
-import com.devson.nvplayer.ui.common.components.FastScrollerOverlay
+import com.devson.nvplayer.ui.common.components.fastscroll.FastScroller
+import com.devson.nvplayer.ui.common.components.fastscroll.FastScrollSectionHelper
 
 @Composable
 fun VideoListContent(
@@ -59,7 +59,18 @@ fun VideoListContent(
         historyMap.values.filter { it.lastPlayedAt > 0L }.maxByOrNull { it.lastPlayedAt }?.uri
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    FastScroller(
+        itemCount = videos.size,
+        listState = if (settings.layoutMode == LayoutMode.LIST) listState else null,
+        gridState = if (settings.layoutMode == LayoutMode.GRID) gridState else null,
+        contentPadding = contentPadding,
+        sectionLabelProvider = { index ->
+            FastScrollSectionHelper.getVideoSectionLabel(
+                video = videos.getOrNull(index),
+                sortField = settings.sortField
+            )
+        }
+    ) {
         if (settings.layoutMode == LayoutMode.GRID) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(settings.gridColumns),
@@ -133,16 +144,5 @@ fun VideoListContent(
                 }
             }
         }
-
-        FastScrollerOverlay(
-            itemCount = videos.size,
-            sectionTextExtractor = { index ->
-                videos.getOrNull(index)?.getSectionLabel(settings.sortField, historyMap) ?: ""
-            },
-            listState = if (settings.layoutMode == LayoutMode.GRID) null else listState,
-            gridState = if (settings.layoutMode == LayoutMode.GRID) gridState else null,
-            topPadding = contentPadding.calculateTopPadding(),
-            bottomPadding = contentPadding.calculateBottomPadding()
-        )
     }
 }
