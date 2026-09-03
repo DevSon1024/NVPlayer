@@ -7,6 +7,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.devson.nvplayer.domain.model.DefaultScreen
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.devson.nvplayer.ui.navigation.components.CapsuleNavigationBar
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -118,7 +126,49 @@ fun AppNavigation(
         )
     )
 
-    val startDestination = "video_list"
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    val isSelectionActive by videoListViewModel.isSelectionActive.collectAsStateWithLifecycle()
+    val topLevelRoutes = setOf("library", "video_list", "vault", "settings")
+    val showBottomBar = currentRoute in topLevelRoutes && !isSelectionActive
+
+    val initialScreen = remember { settingsViewModel.getInitialDefaultScreen() }
+    val startDestination = remember(initialScreen) {
+        when (initialScreen) {
+            DefaultScreen.VIDEO_LIST, DefaultScreen.FOLDERS -> "video_list"
+            DefaultScreen.VAULT -> "vault"
+            DefaultScreen.SETTINGS -> "settings"
+            else -> "library"
+        }
+    }
+
+    val navigateToTopLevel: (String) -> Unit = { targetRoute ->
+        if (currentRoute == targetRoute) {
+            if (targetRoute == "video_list") {
+                videoListViewModel.selectFolder(null)
+                videoListViewModel.setSelectionActive(false)
+                if (videoListViewModel.viewSettings.value.viewMode == ViewMode.FOLDERS) {
+                    videoListViewModel.resetExplorerToRoot()
+                }
+            }
+        } else {
+            if (targetRoute == "video_list") {
+                videoListViewModel.selectFolder(null)
+                videoListViewModel.setSelectionActive(false)
+            }
+            navController.navigate(targetRoute) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+
+    BackHandler(enabled = currentRoute in topLevelRoutes && currentRoute != startDestination) {
+        navigateToTopLevel(startDestination)
+    }
 
     LaunchedEffect(initialUri) {
         if (initialUri != null) {
@@ -152,9 +202,13 @@ fun AppNavigation(
         }
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = startDestination,
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
+            modifier = Modifier.fillMaxSize(),
         enterTransition = {
             slideIntoContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.Left,
@@ -191,10 +245,7 @@ fun AppNavigation(
                     val folder = videoListViewModel.videosByFolder.value.keys.find { it.id == folderId }
                     videoListViewModel.selectFolder(folder)
                     videoListViewModel.updateViewMode(ViewMode.ALL_FOLDERS)
-                    navController.navigate("video_list") {
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                    navigateToTopLevel("video_list")
                 },
                 onVideoClick = { uri, playlist ->
                     val playerVm = playerViewModel()
@@ -246,10 +297,7 @@ fun AppNavigation(
                     }
                 },
                 onBrowseClick = {
-                    navController.navigate("video_list") {
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                    navigateToTopLevel("video_list")
                 },
                 onFeedClick = {
                     videoListViewModel.setFeedVideos(null)
@@ -268,9 +316,7 @@ fun AppNavigation(
                     }
                 },
                 onVaultClick = {
-                    navController.navigate("vault") {
-                        launchSingleTop = true
-                    }
+                    navigateToTopLevel("vault")
                 }
             )
         }
@@ -320,10 +366,7 @@ fun AppNavigation(
                     }
                 },
                 onNavigateToSettings = {
-                    navController.navigate("settings") {
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                    navigateToTopLevel("settings")
                 },
                 onBack = {
                     navController.safePopBackStack()
@@ -401,7 +444,13 @@ fun AppNavigation(
 
         composable("settings") {
             SettingsScreen(
-                onBack = safePopBackStack, // 2. Use the safe helper
+                onBack = {
+                    if (startDestination != "settings") {
+                        navigateToTopLevel(startDestination)
+                    } else {
+                        safePopBackStack()
+                    }
+                },
                 onNavigateToAbout = { navController.navigate("about") { launchSingleTop = true } },
                 onNavigateToLogs = {},
                 onNavigateToPrivacyPolicy = { navController.navigate("privacy_policy") { launchSingleTop = true } },
@@ -410,7 +459,7 @@ fun AppNavigation(
                 onNavigateToProfile = { navController.navigate("profile") { launchSingleTop = true } },
                 onNavigateToCustomHome = { navController.navigate("custom_profile") { launchSingleTop = true } },
                 onNavigateToStorageAnalyzer = { navController.navigate("storage_analyzer") { launchSingleTop = true } },
-                onNavigateToVault = { navController.navigate("vault") { launchSingleTop = true } },
+                onNavigateToVault = { navigateToTopLevel("vault") },
                 onNavigateToPlayerInterface = { navController.navigate("player_interface") { launchSingleTop = true } },
                 onNavigateToScanFolders = { navController.navigate("folder_settings") { launchSingleTop = true } },
                 onNavigateToTool = { navController.navigate("tools") { launchSingleTop = true } },
@@ -522,10 +571,7 @@ fun AppNavigation(
                     val folder = videoListViewModel.videosByFolder.value.keys.find { it.id == folderId }
                     videoListViewModel.selectFolder(folder)
                     videoListViewModel.updateViewMode(ViewMode.ALL_FOLDERS)
-                    navController.navigate("video_list") {
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                    navigateToTopLevel("video_list")
                 },
                 onVideoClick = { uri, playlist ->
                     val playerVm = playerViewModel()
@@ -577,10 +623,7 @@ fun AppNavigation(
                     }
                 },
                 onBrowseClick = {
-                    navController.navigate("video_list") {
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                    navigateToTopLevel("video_list")
                 },
                 onFeedClick = {
                     videoListViewModel.setFeedVideos(null)
@@ -599,9 +642,7 @@ fun AppNavigation(
                     }
                 },
                 onVaultClick = {
-                    navController.navigate("vault") {
-                        launchSingleTop = true
-                    }
+                    navigateToTopLevel("vault")
                 }
             )
         }
@@ -964,6 +1005,15 @@ fun AppNavigation(
                 onUpdateQueueLayoutMode = { settingsViewModel.updateQueueLayoutMode(it) }
             )
         }
+    }
+
+        CapsuleNavigationBar(
+            visible = showBottomBar,
+            currentRoute = currentRoute,
+            onNavigate = { route -> navigateToTopLevel(route) },
+            onTabReselect = { route -> navigateToTopLevel(route) },
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 

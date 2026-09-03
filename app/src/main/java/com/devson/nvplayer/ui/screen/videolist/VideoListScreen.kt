@@ -152,6 +152,16 @@ fun VideoListScreen(
     }
     val isSelectionActive = selectedFolders.isNotEmpty() || selectedVideos.isNotEmpty()
 
+    LaunchedEffect(isSelectionActive) {
+        viewModel.setSelectionActive(isSelectionActive)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.setSelectionActive(false)
+        }
+    }
+
     // Hoisted scroll states - survive recomposition and view-mode toggling
     val folderListState = rememberLazyListState()
     val folderGridState = rememberLazyGridState()
