@@ -126,3 +126,12 @@
 # or reorder methods that the native layer depends on by ABI contract.
 # R8 default (proguard-android-optimize.txt) is already aggressive enough.
 # -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# 9.  GOOGLE TINK / SECURITY CRYPTO & JSR-305 ANNOTATIONS
+# -----------------------------------------------------------------------------
+-dontwarn javax.annotation.**
+-keep class javax.annotation.** { *; }
+-dontwarn com.google.crypto.tink.**
+-keep class com.google.crypto.tink.** { *; }
+

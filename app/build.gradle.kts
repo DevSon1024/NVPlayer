@@ -177,6 +177,10 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+
+    // Biometric Authentication & Encrypted SharedPreferences / Tink
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 }
 
 androidComponents {
