@@ -32,6 +32,9 @@ import com.devson.nvplayer.ui.screen.videolist.VideoListScreen
 import com.devson.nvplayer.ui.screen.FeedScreen
 import com.devson.nvplayer.ui.screen.settings.YtdlpSettingsScreen
 import com.devson.nvplayer.ui.screen.settings.MpvConfigSettingsScreen
+import com.devson.nvplayer.ui.screen.library.LibraryHomeScreen
+import com.devson.nvplayer.ui.screen.library.SeriesDetailScreen
+import com.devson.nvplayer.viewmodel.LibraryViewModel
 import com.devson.nvplayer.viewmodel.HomeViewModel
 import com.devson.nvplayer.viewmodel.PlayerViewModel
 import com.devson.nvplayer.viewmodel.PreFetchedVideoMetadata
@@ -82,6 +85,14 @@ fun AppNavigation(
     val safePopBackStack: () -> Unit = {
         navController.safePopBackStack()
     }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val libraryViewModel: LibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+        factory = LibraryViewModel.Factory(
+            application = context.applicationContext as android.app.Application,
+            videoListViewModel = videoListViewModel
+        )
+    )
 
     val startDestination = "video_list"
 
@@ -595,6 +606,84 @@ fun AppNavigation(
                     }
                 },
                 videoListViewModel = videoListViewModel
+            )
+        }
+
+        composable("library") {
+            LibraryHomeScreen(
+                viewModel = libraryViewModel,
+                onMediaClick = { item ->
+                    val playerVm = playerViewModel()
+                    val flatVideos = videoListViewModel.videosFlat.value
+                    val currentVideo = flatVideos.find { it.uri == item.videoUri } ?: Video(
+                        uri = item.videoUri,
+                        title = item.title,
+                        duration = item.durationMs,
+                        folderName = "",
+                        path = item.videoUri,
+                        size = 0L,
+                        width = 0,
+                        height = 0
+                    )
+                    playerVm.setQueue(listOf(currentVideo))
+                    playerVm.prepareVideo(Uri.parse(item.videoUri), listOf(Uri.parse(item.videoUri)))
+                    navController.navigate("player") {
+                        launchSingleTop = true
+                    }
+                },
+                onSeriesClick = { seriesId ->
+                    navController.navigate("series_detail/$seriesId") {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToSearch = { query ->
+                    navController.navigate("search_results/${Uri.encode(query)}") {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        composable(
+            route = "series_detail/{seriesId}",
+            arguments = listOf(navArgument("seriesId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val seriesId = backStackEntry.arguments?.getLong("seriesId") ?: 0L
+            SeriesDetailScreen(
+                seriesId = seriesId,
+                viewModel = libraryViewModel,
+                onEpisodeSelected = { episode, episodeList ->
+                    val playerVm = playerViewModel()
+                    val flatVideos = videoListViewModel.videosFlat.value
+                    val currentVideo = flatVideos.find { it.uri == episode.fileUri } ?: Video(
+                        uri = episode.fileUri,
+                        title = episode.title ?: "Episode ${episode.episodeNumber}",
+                        duration = 0L,
+                        folderName = "",
+                        path = episode.fileUri,
+                        size = 0L,
+                        width = 0,
+                        height = 0
+                    )
+                    val queueVideos = episodeList.map { ep ->
+                        flatVideos.find { it.uri == ep.fileUri } ?: Video(
+                            uri = ep.fileUri,
+                            title = ep.title ?: "Episode ${ep.episodeNumber}",
+                            duration = 0L,
+                            folderName = "",
+                            path = ep.fileUri,
+                            size = 0L,
+                            width = 0,
+                            height = 0
+                        )
+                    }
+                    playerVm.setQueue(queueVideos)
+                    playerVm.prepareVideo(Uri.parse(episode.fileUri), queueVideos.map { Uri.parse(it.uri) })
+                    navController.navigate("player") {
+                        launchSingleTop = true
+                    }
+                },
+                onBack = safePopBackStack
             )
         }
 
