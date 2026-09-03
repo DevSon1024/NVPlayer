@@ -120,11 +120,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private fun addColumnIfNotExists(db: SupportSQLiteDatabase, tableName: String, columnName: String, columnDef: String) {
+            try {
+                val cursor = db.query("PRAGMA table_info(`$tableName`)")
+                var exists = false
+                while (cursor.moveToNext()) {
+                    val nameIndex = cursor.getColumnIndex("name")
+                    if (nameIndex != -1 && cursor.getString(nameIndex).equals(columnName, ignoreCase = true)) {
+                        exists = true
+                        break
+                    }
+                }
+                cursor.close()
+                if (!exists) {
+                    db.execSQL("ALTER TABLE `$tableName` ADD COLUMN `$columnName` $columnDef")
+                }
+            } catch (_: Exception) {
+                // Ignore if duplicate or unable to alter
+            }
+        }
+
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Add durationMillis column to episodes and movies
-                db.execSQL("ALTER TABLE `episodes` ADD COLUMN `durationMillis` INTEGER NOT NULL DEFAULT 0")
-                db.execSQL("ALTER TABLE `movies` ADD COLUMN `durationMillis` INTEGER NOT NULL DEFAULT 0")
+                addColumnIfNotExists(db, "episodes", "durationMillis", "INTEGER NOT NULL DEFAULT 0")
+                addColumnIfNotExists(db, "movies", "durationMillis", "INTEGER NOT NULL DEFAULT 0")
             }
         }
 
