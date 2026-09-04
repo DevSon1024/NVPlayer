@@ -27,8 +27,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.devson.nvplayer.BuildConfig
 import com.devson.nvplayer.R
 import com.devson.nvplayer.ui.common.components.AnimatedNosvedLogo
-import com.devson.nvplayer.ui.common.components.ProBadgeSize
-import com.devson.nvplayer.ui.common.components.ShiningProBadge
 import com.devson.nvplayer.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,7 +108,7 @@ fun SettingsScreen(
                 start = 16.dp,
                 top = 0.dp,
                 end = 16.dp,
-                bottom = paddingValues.calculateBottomPadding() + 16.dp
+                bottom = paddingValues.calculateBottomPadding() + 96.dp
             )
         ) {
             item {
@@ -427,20 +425,12 @@ private fun AppIdentityCard(
             }
 
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text       = "Nosved",
-                        style      = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color      = MaterialTheme.colorScheme.onSurface
-                    )
-                    ShiningProBadge(
-                        size = ProBadgeSize.SMALL
-                    )
-                }
+                Text(
+                    text       = "Nosved",
+                    style      = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color      = MaterialTheme.colorScheme.onSurface
+                )
                 Spacer(Modifier.height(3.dp))
                 Text(
                     text  = stringResource(R.string.settings_version, versionName),

@@ -62,7 +62,7 @@ fun VideoListTopAppBar(
     selectedCount: Int,
     totalCount: Int,
     showBackButton: Boolean,
-    showHomeBackButton: Boolean = true,
+    showHomeBackButton: Boolean = false,
     onClearSelection: () -> Unit,
     onShowInfo: () -> Unit,
     onSelectAll: () -> Unit,

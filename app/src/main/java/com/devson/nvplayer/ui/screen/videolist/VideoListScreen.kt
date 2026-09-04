@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
@@ -315,7 +316,7 @@ fun VideoListScreen(
                     ViewMode.FOLDERS -> explorerItems.size
                 },
                 showBackButton = selectedFolder != null || (viewSettings.viewMode == ViewMode.FOLDERS && currentExplorerPath != baseRoot),
-                showHomeBackButton = viewSettings.defaultScreen != DefaultScreen.VIDEO_LIST,
+                showHomeBackButton = false,
                 onClearSelection = { 
                     selectedFolders = emptySet()
                     selectedVideos = emptySet()
@@ -549,6 +550,7 @@ fun VideoListScreen(
                     previewTitle = video?.title,
                     previewDurationMs = video?.duration ?: 0L,
                     previewLastPositionMs = lastHistoryEntry?.lastPositionMs ?: 0L,
+                    modifier = Modifier.padding(bottom = 88.dp),
                     onPlay = {
                         video?.let { vid ->
                             val playlist = when (viewSettings.viewMode) {
@@ -570,6 +572,14 @@ fun VideoListScreen(
             }
         }
     ) { padding ->
+        val listBottomPadding = padding.calculateBottomPadding() + if (isSelectionActive) 0.dp else 92.dp
+        val listContentPadding = PaddingValues(
+            start = padding.calculateStartPadding(LocalLayoutDirection.current),
+            top = padding.calculateTopPadding(),
+            end = padding.calculateEndPadding(LocalLayoutDirection.current),
+            bottom = listBottomPadding
+        )
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -660,7 +670,7 @@ fun VideoListScreen(
                                         },
                                         listState = folderListState,
                                         gridState = folderGridState,
-                                        contentPadding = padding
+                                        contentPadding = listContentPadding
                                     )
                                 } else {
                                     val videos = videosByFolder[folder] ?: emptyList()
@@ -684,7 +694,7 @@ fun VideoListScreen(
                                         listState = videoListState,
                                         gridState = videoGridState,
                                         historyMap = historyMap,
-                                        contentPadding = padding
+                                        contentPadding = listContentPadding
                                     )
                                 }
                             }
@@ -711,7 +721,7 @@ fun VideoListScreen(
                                 listState = videoListState,
                                 gridState = videoGridState,
                                 historyMap = historyMap,
-                                contentPadding = padding
+                                contentPadding = listContentPadding
                             )
                         }
                         ViewMode.FOLDERS -> {
@@ -778,7 +788,7 @@ fun VideoListScreen(
                                     },
                                     listState = folderListState,
                                     gridState = folderGridState,
-                                    contentPadding = PaddingValues(bottom = padding.calculateBottomPadding())
+                                    contentPadding = PaddingValues(bottom = listBottomPadding)
                                 )
                             }
                         }

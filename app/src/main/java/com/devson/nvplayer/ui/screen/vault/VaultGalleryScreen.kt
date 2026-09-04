@@ -502,7 +502,7 @@ private fun VaultEmptyState(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .fillMaxSize()
-            .padding(32.dp)
+            .padding(start = 32.dp, top = 32.dp, end = 32.dp, bottom = 96.dp)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,

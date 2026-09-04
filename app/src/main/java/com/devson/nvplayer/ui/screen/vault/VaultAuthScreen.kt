@@ -132,7 +132,7 @@ fun VaultAuthScreen(
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 80.dp),
+            .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 96.dp),
         contentAlignment = Alignment.Center
     ) {
         SnackbarHost(
@@ -163,7 +163,9 @@ fun VaultAuthScreen(
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
                 ) {
                     Spacer(modifier = Modifier.height(4.dp))
 

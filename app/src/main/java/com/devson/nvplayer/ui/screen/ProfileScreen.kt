@@ -782,18 +782,14 @@ private fun QuickActionCardBento(
     modifier: Modifier = Modifier,
     isProminent: Boolean = false
 ) {
-    val gradientBrush = if (isProminent) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val gradientBrush = remember(primaryColor, secondaryColor) {
         Brush.linearGradient(
             colors = listOf(
-                MaterialTheme.colorScheme.primary,
-                MaterialTheme.colorScheme.tertiary
-            )
-        )
-    } else {
-        Brush.linearGradient(
-            colors = listOf(
-                containerColor.copy(alpha = 0.15f),
-                containerColor.copy(alpha = 0.05f)
+                primaryColor,
+                primaryColor.copy(alpha = 0.9f),
+                secondaryColor
             )
         )
     }
