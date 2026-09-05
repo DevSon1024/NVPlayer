@@ -94,6 +94,13 @@ class VideoListViewModel(
         _feedVideos.value = videos
     }
 
+    private val _isSelectionActive = MutableStateFlow(false)
+    val isSelectionActive: StateFlow<Boolean> = _isSelectionActive.asStateFlow()
+
+    fun setSelectionActive(active: Boolean) {
+        _isSelectionActive.value = active
+    }
+
     /**
      * Master-filtered flat list: applies storage path filter, then folder filter mode (whitelist/blacklist).
      * All subsequent derived flows consume this instead of _rawVideosFlat directly.
@@ -504,6 +511,10 @@ class VideoListViewModel(
         if (mode == ViewMode.FOLDERS) {
             _currentExplorerPath.value = currentBaseRoot()
         }
+    }
+
+    fun resetExplorerToRoot() {
+        _currentExplorerPath.value = currentBaseRoot()
     }
 
     fun updateLayoutMode(mode: LayoutMode) {

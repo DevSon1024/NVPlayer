@@ -32,9 +32,9 @@ import com.devson.nvplayer.domain.model.Video
 import com.devson.nvplayer.domain.model.VideoFolder
 import com.devson.nvplayer.domain.model.ViewSettings
 import com.devson.nvplayer.domain.model.WatchHistory
-import com.devson.nvplayer.domain.model.getSectionLabel
 import com.devson.nvplayer.ui.common.components.CustomEmptyStateView
-import com.devson.nvplayer.ui.common.components.FastScrollerOverlay
+import com.devson.nvplayer.ui.common.components.fastscroll.FastScroller
+import com.devson.nvplayer.ui.common.components.fastscroll.FastScrollSectionHelper
 import com.devson.nvplayer.ui.screens.videolist.utils.applyFolderSort
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -73,7 +73,20 @@ fun FolderListContent(
         return
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    FastScroller(
+        itemCount = sortedFolders.size,
+        listState = if (settings.layoutMode == LayoutMode.LIST) listState else null,
+        gridState = if (settings.layoutMode == LayoutMode.GRID) gridState else null,
+        contentPadding = contentPadding,
+        sectionLabelProvider = { index ->
+            val folder = sortedFolders.getOrNull(index)
+            FastScrollSectionHelper.getFolderSectionLabel(
+                folder = folder,
+                videos = if (folder != null) folders[folder] else null,
+                sortField = settings.sortField
+            )
+        }
+    ) {
         if (settings.layoutMode == LayoutMode.GRID) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(settings.gridColumns),
@@ -83,7 +96,7 @@ fun FolderListContent(
                     start = 8.dp,
                     top = contentPadding.calculateTopPadding() + 8.dp,
                     end = 8.dp,
-                    bottom = contentPadding.calculateBottomPadding() + 40.dp
+                    bottom = contentPadding.calculateBottomPadding() + 8.dp
                 ),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -93,10 +106,8 @@ fun FolderListContent(
                     key = { folder -> folder.id },
                     contentType = { "folder_item" }
                 ) { folder ->
-                    val folderVideos = remember(folder, folders) { folders[folder] ?: emptyList() }
-                    val isRecentlyPlayed = remember(folderVideos, mostRecentHistoryUri) {
-                        mostRecentHistoryUri != null && folderVideos.any { it.uri == mostRecentHistoryUri }
-                    }
+                    val folderVideos = folders[folder] ?: emptyList()
+                    val isRecentlyPlayed = mostRecentHistoryUri != null && folderVideos.any { it.uri == mostRecentHistoryUri }
                     val onClick = remember(folder) { { currentOnFolderClick(folder) } }
                     val onLongClick = remember(folder) {
                         {
@@ -122,7 +133,7 @@ fun FolderListContent(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     top = contentPadding.calculateTopPadding(),
-                    bottom = contentPadding.calculateBottomPadding() + 32.dp
+                    bottom = contentPadding.calculateBottomPadding() + 16.dp
                 )
             ) {
                 items(
@@ -130,10 +141,8 @@ fun FolderListContent(
                     key = { folder -> folder.id },
                     contentType = { "folder_item" }
                 ) { folder ->
-                    val folderVideos = remember(folder, folders) { folders[folder] ?: emptyList() }
-                    val isRecentlyPlayed = remember(folderVideos, mostRecentHistoryUri) {
-                        mostRecentHistoryUri != null && folderVideos.any { it.uri == mostRecentHistoryUri }
-                    }
+                    val folderVideos = folders[folder] ?: emptyList()
+                    val isRecentlyPlayed = mostRecentHistoryUri != null && folderVideos.any { it.uri == mostRecentHistoryUri }
                     val onClick = remember(folder) { { currentOnFolderClick(folder) } }
                     val onLongClick = remember(folder) {
                         {
@@ -154,18 +163,5 @@ fun FolderListContent(
                 }
             }
         }
-
-        FastScrollerOverlay(
-            itemCount = sortedFolders.size,
-            sectionTextExtractor = { index ->
-                val folder = sortedFolders.getOrNull(index) ?: return@FastScrollerOverlay ""
-                val folderVideos = folders[folder] ?: emptyList()
-                folder.getSectionLabel(settings.sortField, folderVideos, historyMap)
-            },
-            listState = if (settings.layoutMode == LayoutMode.GRID) null else listState,
-            gridState = if (settings.layoutMode == LayoutMode.GRID) gridState else null,
-            topPadding = contentPadding.calculateTopPadding(),
-            bottomPadding = contentPadding.calculateBottomPadding()
-        )
     }
 }

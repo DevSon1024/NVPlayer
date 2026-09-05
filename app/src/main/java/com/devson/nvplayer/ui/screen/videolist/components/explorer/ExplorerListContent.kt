@@ -30,6 +30,8 @@ import com.devson.nvplayer.ui.screen.videolist.components.video.VideoGridItem
 import com.devson.nvplayer.ui.screen.videolist.components.video.VideoListItem
 import com.devson.nvplayer.ui.screen.videolist.components.folder.FolderGridItem
 import com.devson.nvplayer.ui.screen.videolist.components.folder.FolderListItem
+import com.devson.nvplayer.ui.common.components.fastscroll.FastScroller
+import com.devson.nvplayer.ui.common.components.fastscroll.FastScrollSectionHelper
 import com.devson.nvplayer.ui.screens.videolist.state.ExplorerItem
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -70,7 +72,22 @@ fun ExplorerListContent(
         historyMap.values.filter { it.lastPlayedAt > 0L }.maxByOrNull { it.lastPlayedAt }?.uri
     }
 
-    if (settings.layoutMode == LayoutMode.GRID) {
+    FastScroller(
+        itemCount = items.size,
+        listState = if (settings.layoutMode == LayoutMode.LIST) listState else null,
+        gridState = if (settings.layoutMode == LayoutMode.GRID) gridState else null,
+        contentPadding = contentPadding,
+        sectionLabelProvider = { index ->
+            val item = items.getOrNull(index)
+            val folderVideos = if (item is ExplorerItem.FolderItem) folderVideosMap[item.folder] else null
+            FastScrollSectionHelper.getExplorerSectionLabel(
+                item = item,
+                folderVideos = folderVideos,
+                sortField = settings.sortField
+            )
+        }
+    ) {
+        if (settings.layoutMode == LayoutMode.GRID) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(settings.gridColumns),
             state = gridState,
@@ -220,4 +237,5 @@ fun ExplorerListContent(
             }
         }
     }
+}
 }

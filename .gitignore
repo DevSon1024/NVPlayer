@@ -21,3 +21,4 @@ nosved-player-commits-v1.3.0.md
 /.idea
 /.kotlin
 app/src/main/java/com/devson/nvplayer/ui/screen/settings/AboutScreenLogoAnimation.kt
+/docs

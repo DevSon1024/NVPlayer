@@ -42,7 +42,10 @@ fun SettingsScreen(
     onNavigateToTool: () -> Unit = {},
     onNavigateToRecycleBin: () -> Unit = {},
     onNavigateToPlayerInterface: () -> Unit = {},
+    onNavigateToProfile: () -> Unit = {},
     onNavigateToCustomHome: () -> Unit = {},
+    onNavigateToStorageAnalyzer: () -> Unit = {},
+    onNavigateToVault: () -> Unit = {},
     onNavigateToGestures: () -> Unit = {},
     onNavigateToYtdlpSettings: () -> Unit = {},
     onNavigateToMpvConfig: () -> Unit = {},
@@ -105,7 +108,7 @@ fun SettingsScreen(
                 start = 16.dp,
                 top = 0.dp,
                 end = 16.dp,
-                bottom = paddingValues.calculateBottomPadding() + 16.dp
+                bottom = paddingValues.calculateBottomPadding() + 96.dp
             )
         ) {
             item {
@@ -113,6 +116,7 @@ fun SettingsScreen(
                 // App identity card
                 AppIdentityCard(
                     versionName = versionName,
+                    onClick = onNavigateToProfile,
                     onVersionTap = {
                         if (!isDeveloperMode) {
                             val now = System.currentTimeMillis()
@@ -176,16 +180,6 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
                         SettingsItemRow(
-                            icon = Icons.Default.Home,
-                            title = "Custom Home",
-                            subtitle = "Customize Home Screen Layout",
-                            onClick = onNavigateToCustomHome
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 72.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                        SettingsItemRow(
                             icon = Icons.Default.Cloud,
                             title = "yt-dlp Streaming",
                             subtitle = "Configure format preferences and environment",
@@ -224,6 +218,26 @@ fun SettingsScreen(
                             title = "Recycle Bin",
                             subtitle = "Manage deleted videos",
                             onClick = onNavigateToRecycleBin
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsItemRow(
+                            icon = Icons.Default.Analytics,
+                            title = "Storage Analyzer",
+                            subtitle = "Inspect video space usage and disk capacity",
+                            onClick = onNavigateToStorageAnalyzer
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsItemRow(
+                            icon = Icons.Default.Lock,
+                            title = "Privacy Vault",
+                            subtitle = "Encrypted storage for private videos",
+                            onClick = onNavigateToVault
                         )
                     }
                 }
@@ -369,6 +383,7 @@ fun SettingsItemRow(
 @Composable
 private fun AppIdentityCard(
     versionName: String,
+    onClick: () -> Unit = {},
     onVersionTap: () -> Unit = {}
 ) {
     Card(
@@ -382,7 +397,7 @@ private fun AppIdentityCard(
         Row(
             modifier            = Modifier
                 .fillMaxWidth()
-                .clickable { onVersionTap() }
+                .clickable { onClick() }
                 .padding(horizontal = 20.dp, vertical = 20.dp),
             verticalAlignment   = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -411,7 +426,7 @@ private fun AppIdentityCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text       = stringResource(R.string.app_name),
+                    text       = "Nosved",
                     style      = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color      = MaterialTheme.colorScheme.onSurface
@@ -424,18 +439,30 @@ private fun AppIdentityCard(
                 )
             }
 
-            // Subtle badge
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (BuildConfig.DEBUG) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.padding(end = 2.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text      = if (BuildConfig.DEBUG) "DEBUG" else stringResource(R.string.settings_stable),
-                    style     = MaterialTheme.typography.labelSmall,
-                    color     = if (BuildConfig.DEBUG) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontWeight = FontWeight.Bold,
-                    modifier  = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                // Subtle badge
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (BuildConfig.DEBUG) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.clickable { onVersionTap() }
+                ) {
+                    Text(
+                        text      = if (BuildConfig.DEBUG) "DEBUG" else stringResource(R.string.settings_stable),
+                        style     = MaterialTheme.typography.labelSmall,
+                        color     = if (BuildConfig.DEBUG) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = FontWeight.Bold,
+                        modifier  = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "View Profile",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }

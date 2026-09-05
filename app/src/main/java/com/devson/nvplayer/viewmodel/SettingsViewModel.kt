@@ -50,6 +50,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun getInitialDefaultScreen(): DefaultScreen =
         viewSettingsRepo.viewSettingsFlow.value.defaultScreen
 
+    val defaultScreen: StateFlow<DefaultScreen> = viewSettingsRepo.viewSettingsFlow
+        .map { it.defaultScreen }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), getInitialDefaultScreen())
+
     /**
      * Emits null = follow system, true = force dark, false = force light.
      */

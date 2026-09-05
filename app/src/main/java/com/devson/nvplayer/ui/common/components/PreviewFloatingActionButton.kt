@@ -80,7 +80,8 @@ fun PreviewFloatingActionButton(
     previewDurationMs: Long,
     previewLastPositionMs: Long,
     onPlay: () -> Unit,
-    onNetworkStreamClick: () -> Unit
+    modifier: Modifier = Modifier,
+    onNetworkStreamClick: () -> Unit = {}
 ) {
     var isMenuExpanded by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
@@ -98,7 +99,10 @@ fun PreviewFloatingActionButton(
         label = "iconRotation"
     )
 
-    Box(contentAlignment = Alignment.BottomEnd) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.BottomEnd
+    ) {
         // 1. Extending Options UI (Speed Dial & Last Played Preview Card)
         AnimatedVisibility(
             visible = isMenuExpanded,

@@ -47,6 +47,7 @@ import com.devson.nvplayer.ui.theme.AppThemePalette
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.devson.nvplayer.viewmodel.SettingsViewModel
 import com.devson.nvplayer.domain.model.ThumbnailMode
+import com.devson.nvplayer.domain.model.DefaultScreen
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,6 +61,7 @@ fun AppearanceSettingsScreen(
     val selectedPalette by settingsViewModel.selectedPalette.collectAsState()
     val navBarTransparent by settingsViewModel.isNavBarTransparent.collectAsState()
     val isAmoledTheme by settingsViewModel.isAmoledTheme.collectAsState()
+    val defaultScreen by settingsViewModel.defaultScreen.collectAsState()
     val isEffectivelyDark = isDark ?: isSystemInDarkTheme()
     val viewSettingsVal by settingsViewModel.viewSettings.collectAsState()
 
@@ -259,6 +261,75 @@ fun AppearanceSettingsScreen(
                     checked   = navBarTransparent,
                     onCheckedChange = { settingsViewModel.setNavBarTransparent(it) }
                 )
+            }
+
+            // STARTUP & NAVIGATION section
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                AppearanceSectionLabel("Startup & Navigation")
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            RoundedCornerShape(12.dp)
+                        ),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Home,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = "Default Startup Tab",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Choose which screen opens when launching the app",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        val screens = listOf(
+                            Triple("Folders", DefaultScreen.VIDEO_LIST, Icons.Default.Folder),
+                            Triple("Library", DefaultScreen.LIBRARY, Icons.Default.VideoLibrary),
+                            Triple("Vault", DefaultScreen.VAULT, Icons.Default.Lock)
+                        )
+
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            screens.forEachIndexed { index, (label, screenEnum, _) ->
+                                SegmentedButton(
+                                    selected = defaultScreen == screenEnum,
+                                    onClick = { settingsViewModel.updateDefaultScreen(screenEnum) },
+                                    shape = SegmentedButtonDefaults.itemShape(index = index, count = screens.size)
+                                ) {
+                                    Text(label)
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // LANGUAGE section

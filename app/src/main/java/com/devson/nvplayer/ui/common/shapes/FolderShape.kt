@@ -34,4 +34,18 @@ class FolderShape(private val cornerRadiusDp: Float = 8f) : Shape {
         }
         return Outline.Generic(path)
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is FolderShape) return false
+        return cornerRadiusDp == other.cornerRadiusDp
+    }
+
+    override fun hashCode(): Int = cornerRadiusDp.hashCode()
+
+    companion object {
+        val Default = FolderShape(8f)
+    }
 }
+
+val DefaultFolderShape = FolderShape.Default

@@ -15,6 +15,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.filled.Movie
 
+import androidx.compose.material.icons.rounded.Subtitles
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToolScreen(
@@ -22,7 +24,8 @@ fun ToolScreen(
     onNavigateToMilliSeconds: () -> Unit,
     onNavigateToVideoEditor: () -> Unit,
     onNavigateToMediaStoreFinder: () -> Unit,
-    onNavigateToFrameExtractor: () -> Unit = {}
+    onNavigateToFrameExtractor: () -> Unit = {},
+    onNavigateToSubtitleExtractor: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -49,6 +52,12 @@ fun ToolScreen(
                 ),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            ToolHubCard(
+                icon = Icons.Rounded.Subtitles,
+                title = "Subtitle Extractor",
+                description = "Extract embedded SRT or ASS subtitles from video files",
+                onClick = onNavigateToSubtitleExtractor
+            )
             ToolHubCard(
                 icon = Icons.Default.Movie,
                 title = "Batch Frame Extractor",

@@ -1,7 +1,7 @@
 package com.devson.nvplayer.domain.model
 
 enum class DefaultScreen {
-    HOME, FOLDERS, HISTORY, VIDEO_LIST
+    HOME, FOLDERS, HISTORY, VIDEO_LIST, LIBRARY, VAULT, SETTINGS
 }
 
 data class ViewSettings(

@@ -47,6 +47,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import com.devson.nvplayer.domain.model.Video
 import com.devson.nvplayer.util.TagStatusDialog
 
@@ -58,7 +63,9 @@ fun VideoSelectionBottomBar(
     onDelete: () -> Unit,
     onRename: () -> Unit,
     onShare: () -> Unit,
-    onMarkStatus: (String) -> Unit
+    onMarkStatus: (String) -> Unit,
+    onAddToVault: (() -> Unit)? = null,
+    onExtractSubtitles: (() -> Unit)? = null
 ) {
     VideoSelectionBottomBar(
         selectedVideos = selectedVideos,
@@ -68,6 +75,8 @@ fun VideoSelectionBottomBar(
         onRename = onRename,
         onShare = onShare,
         onMarkStatus = onMarkStatus,
+        onAddToVault = onAddToVault,
+        onExtractSubtitles = onExtractSubtitles,
         showTagAndShare = true
     )
 }
@@ -81,9 +90,12 @@ fun VideoSelectionBottomBar(
     onRename: () -> Unit,
     onShare: () -> Unit,
     onMarkStatus: (String) -> Unit,
+    onAddToVault: (() -> Unit)? = null,
+    onExtractSubtitles: (() -> Unit)? = null,
     showTagAndShare: Boolean
 ) {
     var showTagDialog by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
 
     if (showTagDialog) {
         TagStatusDialog(
@@ -125,25 +137,27 @@ fun VideoSelectionBottomBar(
                 horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Move
+                // 1. Move
                 ActionColumn(
                     icon = Icons.AutoMirrored.Filled.DriveFileMove,
                     label = "Move",
                     onClick = onMove
                 )
-                // Copy
-                ActionColumn(
-                    icon = Icons.Filled.ContentCopy,
-                    label = "Copy",
-                    onClick = onCopy
-                )
-                // Delete
+                // 2. Share
+                if (showTagAndShare) {
+                    ActionColumn(
+                        icon = Icons.Filled.Share,
+                        label = "Share",
+                        onClick = onShare
+                    )
+                }
+                // 3. Delete
                 ActionColumn(
                     icon = Icons.Filled.Delete,
                     label = "Delete",
                     onClick = onDelete
                 )
-                // Rename with rubber animation
+                // 4. Rename with rubber animation
                 AnimatedVisibility(
                     visible = selectedVideos.size == 1,
                     enter = expandHorizontally(
@@ -167,21 +181,72 @@ fun VideoSelectionBottomBar(
                         onClick = onRename
                     )
                 }
-                // Share
-                if (showTagAndShare) {
-                    ActionColumn(
-                        icon = Icons.Filled.Share,
-                        label = "Share",
-                        onClick = onShare
-                    )
-                }
-                // Tagging
+                // 5. Tagging
                 if (showTagAndShare) {
                     ActionColumn(
                         icon = Icons.AutoMirrored.Filled.Label,
                         label = "Tag",
                         onClick = { showTagDialog = true }
                     )
+                }
+                // 6. More (Copy & Add to Vault)
+                Box {
+                    ActionColumn(
+                        icon = Icons.Default.MoreVert,
+                        label = "More",
+                        onClick = { showMoreMenu = true }
+                    )
+                    DropdownMenu(
+                        expanded = showMoreMenu,
+                        onDismissRequest = { showMoreMenu = false }
+                    ) {
+                        if (selectedVideos.size == 1 && onExtractSubtitles != null) {
+                            DropdownMenuItem(
+                                text = { Text("Subtitle Extraction") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.Subtitles,
+                                        contentDescription = "Subtitle Extraction",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    showMoreMenu = false
+                                    onExtractSubtitles()
+                                }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("Copy") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Filled.ContentCopy,
+                                    contentDescription = "Copy",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            onClick = {
+                                showMoreMenu = false
+                                onCopy()
+                            }
+                        )
+                        if (onAddToVault != null) {
+                            DropdownMenuItem(
+                                text = { Text(if (selectedVideos.size > 1) "Add all to Vault (${selectedVideos.size})" else "Add to Vault") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.Lock,
+                                        contentDescription = "Add to Vault",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    showMoreMenu = false
+                                    onAddToVault()
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
