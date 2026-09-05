@@ -474,7 +474,8 @@ fun AppNavigation(
                 onNavigateToMilliSeconds = { navController.navigate("tools_milliseconds") { launchSingleTop = true } },
                 onNavigateToVideoEditor = {},
                 onNavigateToMediaStoreFinder = { navController.navigate("tools_mediastore_finder") { launchSingleTop = true } },
-                onNavigateToFrameExtractor = { navController.navigate("tools_frame_extractor") { launchSingleTop = true } }
+                onNavigateToFrameExtractor = { navController.navigate("tools_frame_extractor") { launchSingleTop = true } },
+                onNavigateToSubtitleExtractor = { navController.navigate("tools_subtitle_extractor") { launchSingleTop = true } }
             )
         }
 
@@ -492,6 +493,12 @@ fun AppNavigation(
 
         composable("tools_frame_extractor") {
             com.devson.nvplayer.ui.screen.tools.FrameExtractionScreen(
+                onBack = safePopBackStack
+            )
+        }
+
+        composable("tools_subtitle_extractor") {
+            com.devson.nvplayer.ui.screen.tools.SubtitleExtractionScreen(
                 onBack = safePopBackStack
             )
         }
