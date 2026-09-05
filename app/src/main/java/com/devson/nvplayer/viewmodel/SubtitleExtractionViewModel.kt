@@ -92,7 +92,8 @@ class SubtitleExtractionViewModel : ViewModel() {
                     track = track,
                     targetExtension = targetFormat
                 )
-                val savedDir = file.parent ?: Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).path
+                val defaultDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "NosvedPlayer/Extracted-Subtitles").path
+                val savedDir = file.parent ?: defaultDir
                 _uiState.value = SubtitleExtractionUiState.Success(
                     extractedFiles = listOf(file),
                     savedDirectory = savedDir
@@ -133,8 +134,8 @@ class SubtitleExtractionViewModel : ViewModel() {
                     )
                 }
 
-                val savedDir = files.firstOrNull()?.parent
-                    ?: Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).path
+                val defaultDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "NosvedPlayer/Extracted-Subtitles").path
+                val savedDir = files.firstOrNull()?.parent ?: defaultDir
 
                 _uiState.value = SubtitleExtractionUiState.Success(
                     extractedFiles = files,

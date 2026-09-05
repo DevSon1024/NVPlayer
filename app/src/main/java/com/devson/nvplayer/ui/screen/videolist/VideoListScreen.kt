@@ -64,6 +64,11 @@ import com.devson.nvplayer.viewmodel.FileOperationsViewModel
 import com.devson.nvplayer.viewmodel.HomeViewModel
 import com.devson.nvplayer.viewmodel.VideoListViewModel
 import com.devson.nvplayer.ui.screens.videolist.state.ExplorerItem
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import com.devson.nvplayer.data.security.VaultSecurityManager
+import com.devson.nvplayer.viewmodel.VaultGalleryViewModel
+import com.devson.nvplayer.ui.screen.tools.SubtitleExtractionBottomSheet
 import kotlin.collections.get
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -77,7 +82,10 @@ fun VideoListScreen(
     onPlayStream: (Uri) -> Unit = {},
     onNetworkHistoryClick: () -> Unit = {},
     viewModel: VideoListViewModel = viewModel(),
-    homeViewModel: HomeViewModel
+    homeViewModel: HomeViewModel,
+    vaultGalleryViewModel: VaultGalleryViewModel? = null,
+    vaultSecurityManager: VaultSecurityManager? = null,
+    onNavigateToVault: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var isAnimationFinished by remember { mutableStateOf(false) }
@@ -146,6 +154,38 @@ fun VideoListScreen(
     var selectedFolders by remember { mutableStateOf(emptySet<VideoFolder>()) }
     var selectedVideos by remember { mutableStateOf(emptySet<Video>()) }
     var showInfoBottomSheet by remember { mutableStateOf(false) }
+
+    // Subtitle Extraction & Vault states
+    var videoForSubtitleExtraction by remember { mutableStateOf<Video?>(null) }
+    var showVaultConfirmDialog by remember { mutableStateOf(false) }
+    var showVaultSetupDialog by remember { mutableStateOf(false) }
+    var videosToVault by remember { mutableStateOf<List<Video>>(emptyList()) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val vaultPendingIntentSender by vaultGalleryViewModel?.pendingIntentSender?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(null) }
+    val vaultIntentSenderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) {
+        vaultGalleryViewModel?.clearPendingIntentSender()
+        viewModel.loadVideos()
+    }
+
+    LaunchedEffect(vaultPendingIntentSender) {
+        vaultPendingIntentSender?.let { sender ->
+            vaultIntentSenderLauncher.launch(
+                IntentSenderRequest.Builder(sender).build()
+            )
+        }
+    }
+
+    val vaultStatusMessage by vaultGalleryViewModel?.statusMessage?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(null) }
+    LaunchedEffect(vaultStatusMessage) {
+        vaultStatusMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            vaultGalleryViewModel?.clearStatusMessage()
+            viewModel.loadVideos()
+        }
+    }
 
     val sortedFolderKeys = remember(videosByFolder, viewSettings.sortField, viewSettings.sortDirection) {
         val keys = videosByFolder.keys.toList()
@@ -296,6 +336,7 @@ fun VideoListScreen(
         }
     }
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             val titleText = when (viewSettings.viewMode) {
@@ -416,7 +457,7 @@ fun VideoListScreen(
             )
         },
         bottomBar = {
-            if (isSelectionActive) {
+            if (isSelectionActive && videoForSubtitleExtraction == null) {
                 // Unified URI computation across all view modes
                 val allVideosFlat = videosFlat
                 val selectedUris: List<Uri> = remember(
@@ -534,7 +575,23 @@ fun VideoListScreen(
                             selectedVideos = emptySet()
                             selectedFolders = emptySet()
                         },
-                        showTagAndShare = true
+                        showTagAndShare = true,
+                        onAddToVault = if (vaultGalleryViewModel != null) {
+                            {
+                                val toVault = selectedVideos.toList()
+                                if (toVault.isNotEmpty()) {
+                                    if (vaultSecurityManager?.isPinSet() == true) {
+                                        videosToVault = toVault
+                                        showVaultConfirmDialog = true
+                                    } else {
+                                        showVaultSetupDialog = true
+                                    }
+                                }
+                            }
+                        } else null,
+                        onExtractSubtitles = {
+                            videoForSubtitleExtraction = selectedVideos.firstOrNull()
+                        }
                     )
                 }
             }
@@ -1004,6 +1061,108 @@ fun VideoListScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showYtdlpMissingDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
+    videoForSubtitleExtraction?.let { video ->
+        SubtitleExtractionBottomSheet(
+            video = video,
+            onDismissRequest = { videoForSubtitleExtraction = null }
+        )
+    }
+
+    if (showVaultSetupDialog) {
+        AlertDialog(
+            onDismissRequest = { showVaultSetupDialog = false },
+            title = {
+                Text(
+                    text = "Vault Not Set Up",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Text(
+                    text = "A PIN has not been created for your Vault yet. Set up your Vault security first to lock videos.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showVaultSetupDialog = false
+                        onNavigateToVault?.invoke()
+                    }
+                ) {
+                    Text("Set Up Vault")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVaultSetupDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
+    if (showVaultConfirmDialog) {
+        val count = videosToVault.size
+        AlertDialog(
+            onDismissRequest = {
+                showVaultConfirmDialog = false
+                videosToVault = emptyList()
+            },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = {
+                Text(
+                    text = if (count == 1) "Move to Vault?" else "Move $count Videos to Vault?",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Text(
+                    text = if (count == 1) {
+                        "This video will be encrypted and moved into your private vault. It will no longer appear in your public gallery."
+                    } else {
+                        "These $count videos will be encrypted and moved into your private vault. They will no longer appear in your public gallery."
+                    },
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val uris = videosToVault.map { Uri.parse(it.uri) }
+                        val titles = videosToVault.map { it.title }
+                        showVaultConfirmDialog = false
+                        selectedVideos = emptySet()
+                        selectedFolders = emptySet()
+                        vaultGalleryViewModel?.importVideos(uris, titles)
+                        videosToVault = emptyList()
+                    }
+                ) {
+                    Text("Move to Vault")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showVaultConfirmDialog = false
+                        videosToVault = emptyList()
+                    }
+                ) {
                     Text("Cancel")
                 }
             },

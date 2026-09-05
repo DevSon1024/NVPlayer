@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import com.devson.nvplayer.domain.model.Video
@@ -63,7 +64,8 @@ fun VideoSelectionBottomBar(
     onRename: () -> Unit,
     onShare: () -> Unit,
     onMarkStatus: (String) -> Unit,
-    onAddToVault: (() -> Unit)? = null
+    onAddToVault: (() -> Unit)? = null,
+    onExtractSubtitles: (() -> Unit)? = null
 ) {
     VideoSelectionBottomBar(
         selectedVideos = selectedVideos,
@@ -74,6 +76,7 @@ fun VideoSelectionBottomBar(
         onShare = onShare,
         onMarkStatus = onMarkStatus,
         onAddToVault = onAddToVault,
+        onExtractSubtitles = onExtractSubtitles,
         showTagAndShare = true
     )
 }
@@ -88,6 +91,7 @@ fun VideoSelectionBottomBar(
     onShare: () -> Unit,
     onMarkStatus: (String) -> Unit,
     onAddToVault: (() -> Unit)? = null,
+    onExtractSubtitles: (() -> Unit)? = null,
     showTagAndShare: Boolean
 ) {
     var showTagDialog by remember { mutableStateOf(false) }
@@ -196,6 +200,22 @@ fun VideoSelectionBottomBar(
                         expanded = showMoreMenu,
                         onDismissRequest = { showMoreMenu = false }
                     ) {
+                        if (selectedVideos.size == 1 && onExtractSubtitles != null) {
+                            DropdownMenuItem(
+                                text = { Text("Subtitle Extraction") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.Subtitles,
+                                        contentDescription = "Subtitle Extraction",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    showMoreMenu = false
+                                    onExtractSubtitles()
+                                }
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("Copy") },
                             leadingIcon = {
@@ -212,7 +232,7 @@ fun VideoSelectionBottomBar(
                         )
                         if (onAddToVault != null) {
                             DropdownMenuItem(
-                                text = { Text("Add to Vault") },
+                                text = { Text(if (selectedVideos.size > 1) "Add all to Vault (${selectedVideos.size})" else "Add to Vault") },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Filled.Lock,

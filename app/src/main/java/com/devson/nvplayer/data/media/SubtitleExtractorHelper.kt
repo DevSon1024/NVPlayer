@@ -752,16 +752,45 @@ object SubtitleExtractorHelper {
         val utf8Bom = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
         val contentBytes = content.toByteArray(Charsets.UTF_8)
 
+        val moviesRelativePath = "${Environment.DIRECTORY_MOVIES}/NosvedPlayer/Extracted-Subtitles/"
+        val moviesPublicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES)
+        val targetFolder = File(moviesPublicDir, "NosvedPlayer/Extracted-Subtitles")
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, moviesRelativePath)
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
 
-            val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-                ?: throw IOException("Failed to create MediaStore download record for $fileName")
+            var uri: Uri? = runCatching {
+                context.contentResolver.insert(MediaStore.Files.getContentUri("external"), contentValues)
+            }.getOrNull()
+
+            if (uri == null) {
+                if (!targetFolder.exists()) {
+                    targetFolder.mkdirs()
+                }
+                val directFile = File(targetFolder, fileName)
+                val directSuccess = runCatching {
+                    directFile.outputStream().use { os ->
+                        os.write(utf8Bom)
+                        os.write(contentBytes)
+                        os.flush()
+                    }
+                    true
+                }.getOrDefault(false)
+
+                if (directSuccess) {
+                    MediaScannerConnection.scanFile(context, arrayOf(directFile.absolutePath), arrayOf(mimeType), null)
+                    return directFile
+                }
+
+                contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/NosvedPlayer/Extracted-Subtitles/")
+                uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                    ?: throw IOException("Failed to create MediaStore record for $fileName")
+            }
 
             context.contentResolver.openOutputStream(uri)?.use { os ->
                 os.write(utf8Bom)
@@ -773,16 +802,16 @@ object SubtitleExtractorHelper {
             contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
             context.contentResolver.update(uri, contentValues, null, null)
 
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val file = File(downloadsDir, fileName)
+            val file = File(targetFolder, fileName).let {
+                if (it.exists()) it else File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "NosvedPlayer/Extracted-Subtitles/$fileName")
+            }
             MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), arrayOf(mimeType), null)
             return file
         } else {
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            if (!downloadsDir.exists()) {
-                downloadsDir.mkdirs()
+            if (!targetFolder.exists()) {
+                targetFolder.mkdirs()
             }
-            val file = File(downloadsDir, fileName)
+            val file = File(targetFolder, fileName)
             file.outputStream().use { os ->
                 os.write(utf8Bom)
                 os.write(contentBytes)

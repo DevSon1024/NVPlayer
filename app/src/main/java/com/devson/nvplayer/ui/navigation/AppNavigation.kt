@@ -376,7 +376,12 @@ fun AppNavigation(
                     }
                 },
                 viewModel = videoListViewModel,
-                homeViewModel = homeViewModel
+                homeViewModel = homeViewModel,
+                vaultGalleryViewModel = vaultGalleryViewModel,
+                vaultSecurityManager = vaultSecurityManager,
+                onNavigateToVault = {
+                    navigateToTopLevel("vault")
+                }
             )
         }
 
